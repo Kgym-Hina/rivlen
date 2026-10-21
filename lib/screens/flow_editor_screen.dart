@@ -92,6 +92,15 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       )
       .toList(growable: false);
 
+  FlowNode? get _selectedNode {
+    final id = _selectedNodeId;
+    if (id == null) return null;
+    for (final node in _visibleNodes) {
+      if (node['id']?.toString() == id) return node;
+    }
+    return null;
+  }
+
   String _canonical(List<FlowNode> nodes) => jsonEncode(nodes);
 
   void _recordSnapshot() {
@@ -377,7 +386,10 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
   }
 
   Future<void> _selectLink(FlowLink link) async {
-    setState(() => _selectedLink = link);
+    setState(() {
+      _selectedNodeId = null;
+      _selectedLink = link;
+    });
     final action = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: RivlenColors.surface,
@@ -1038,6 +1050,10 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                   _selectedNodeId = id;
                   _selectedLink = null;
                 }),
+                onClearSelection: () => setState(() {
+                  _selectedNodeId = null;
+                  _selectedLink = null;
+                }),
                 onEditNode: _editNode,
                 onMoveNode: _moveNode,
                 onMoveEnd: _endMove,
@@ -1052,6 +1068,12 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                 onFitBounds: () => _canvasKey.currentState?.resetView(),
               ),
             ),
+            if (_selectedNode != null)
+              _SelectedNodeBar(
+                node: _selectedNode!,
+                onEdit: () => _editNode(_selectedNodeId!),
+                onDelete: () => _deleteNode(_selectedNodeId!),
+              ),
             _BottomBar(
               tabLabel: tabLabel,
               onFlows: _showFlows,
@@ -1059,6 +1081,88 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
               onMore: _more,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectedNodeBar extends StatelessWidget {
+  const _SelectedNodeBar({
+    required this.node,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final FlowNode node;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = node['type']?.toString() ?? '';
+    return Material(
+      color: RivlenColors.surface,
+      child: SafeArea(
+        top: false,
+        bottom: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: RivlenColors.line)),
+          ),
+          child: Row(
+            children: [
+              _NodeGlyph(type: type),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      nodeTitle(node),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '类型 · $type',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: RivlenColors.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 17),
+                label: const Text('编辑'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 36),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline_rounded, size: 17),
+                label: const Text('删除'),
+                style: TextButton.styleFrom(
+                  foregroundColor: RivlenColors.wine,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 36),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1167,6 +1271,7 @@ class _NodeGlyph extends StatelessWidget {
           color: color,
           fontSize: 17,
           fontWeight: FontWeight.w700,
+          height: 1,
         ),
       ),
     );
@@ -1379,17 +1484,26 @@ class _NodeEditorSheet extends StatefulWidget {
 class _NodeEditorSheetState extends State<_NodeEditorSheet> {
   late FlowNode _draft;
   late TextEditingController _name;
-  late Map<String, TextEditingController> _fields;
+  final Map<String, TextEditingController> _fields = {};
 
   @override
   void initState() {
     super.initState();
     _draft = Map<String, dynamic>.from(widget.initial);
     _name = TextEditingController(text: _draft['name']?.toString() ?? '');
-    _fields = {
-      for (final field in editableFields(_draft))
-        field: TextEditingController(text: _draft[field]?.toString() ?? ''),
-    };
+    _syncControllers();
+  }
+
+  void _syncControllers() {
+    for (final controller in _fields.values) {
+      controller.dispose();
+    }
+    _fields.clear();
+    for (final field in nodeEditorFields(_draft)) {
+      _fields[field] = TextEditingController(
+        text: _draft[field]?.toString() ?? '',
+      );
+    }
   }
 
   @override
@@ -1439,22 +1553,35 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
       setState(() {
         _draft = result;
         _name.text = _draft['name']?.toString() ?? '';
-        for (final entry in _fields.entries) {
-          entry.value.text = _draft[entry.key]?.toString() ?? '';
-        }
+        _syncControllers();
       });
     }
+  }
+
+  Future<void> _editStructuredField(String field) async {
+    final result = await Navigator.of(context).push<_NodeValueEditResult>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _NodeValueEditor(
+          title: _humanize(field),
+          initialValue: _draft[field],
+        ),
+      ),
+    );
+    if (result != null) setState(() => _draft[field] = result.value);
   }
 
   void _save() {
     _draft['name'] = _name.text.trim();
     for (final entry in _fields.entries) {
-      final original = widget.initial[entry.key];
-      final text = entry.value.text;
+      final original = _draft[entry.key];
+      final text = entry.value.text.trim();
       if (original is int) {
         _draft[entry.key] = int.tryParse(text) ?? original;
       } else if (original is double) {
         _draft[entry.key] = double.tryParse(text) ?? original;
+      } else if (original is num) {
+        _draft[entry.key] = num.tryParse(text) ?? original;
       } else {
         _draft[entry.key] = text;
       }
@@ -1465,6 +1592,7 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final complex = complexField(_draft);
+    final structured = nodeStructuredFields(_draft);
     final viewInsets = MediaQuery.viewInsetsOf(context).bottom;
     return SafeArea(
       child: Padding(
@@ -1534,22 +1662,37 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    ..._fields.entries.map(
-                      (entry) => Padding(
+                    ...nodeEditorFields(_draft).map((field) {
+                      final value = _draft[field];
+                      if (value is bool) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            value: value,
+                            onChanged: (next) =>
+                                setState(() => _draft[field] = next),
+                            title: Text(_humanize(field)),
+                            subtitle: Text(field),
+                          ),
+                        );
+                      }
+                      final controller = _fields[field];
+                      if (controller == null) return const SizedBox.shrink();
+                      return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: TextField(
-                          controller: entry.value,
-                          keyboardType:
-                              entry.key == 'url' || entry.key == 'topic'
-                              ? TextInputType.text
-                              : TextInputType.text,
+                          controller: controller,
+                          keyboardType: _keyboardType(value),
                           decoration: InputDecoration(
-                            labelText: _humanize(entry.key),
-                            prefixIcon: Icon(_fieldIcon(entry.key)),
+                            labelText: _humanize(field),
+                            prefixIcon: Icon(_fieldIcon(field)),
+                            helperText: field,
+                            helperMaxLines: 1,
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    }),
                     if (complex != null) ...[
                       const SizedBox(height: 2),
                       _EditorActionTile(
@@ -1563,6 +1706,17 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
                         onTap: () => _editComplexField(complex),
                       ),
                     ],
+                    ...structured.map(
+                      (field) => Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: _EditorActionTile(
+                          icon: Icons.data_object_rounded,
+                          title: '编辑 ${_humanize(field)}',
+                          subtitle: _previewJson(_draft[field]),
+                          onTap: () => _editStructuredField(field),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     _EditorActionTile(
                       icon: Icons.data_object_rounded,
@@ -1593,6 +1747,13 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
     );
   }
 
+  TextInputType _keyboardType(dynamic value) {
+    if (value is int || value is double || value is num) {
+      return const TextInputType.numberWithOptions(decimal: true);
+    }
+    return TextInputType.text;
+  }
+
   String _humanize(String value) => switch (value) {
     'topic' => '主题',
     'payload' => '消息内容',
@@ -1605,7 +1766,28 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
     'method' => '请求方法',
     'url' => '请求地址',
     'qos' => 'QoS',
-    _ => value,
+    'entityId' || 'entity_id' => '实体',
+    'server' => '服务器',
+    'domain' => '域',
+    'service' => '服务',
+    'service_domain' => '服务域',
+    'action' => '动作',
+    'dataType' => '数据类型',
+    'halt_if' => '停止条件',
+    'halt_if_type' => '条件类型',
+    'halt_if_compare' => '比较方式',
+    'outputInitially' => '初始输出',
+    'stateType' => '状态类型',
+    'for' => '持续时间',
+    'forType' => '持续时间类型',
+    'forUnits' => '时间单位',
+    _ =>
+      value
+          .replaceAllMapped(
+            RegExp(r'([a-z0-9])([A-Z])'),
+            (match) => '${match.group(1)} ${match.group(2)}',
+          )
+          .replaceAll(RegExp(r'[_-]+'), ' '),
   };
 
   IconData _fieldIcon(String key) => switch (key) {
@@ -1613,8 +1795,109 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
     'repeat' || 'timeout' || 'timeoutUnits' => Icons.schedule_rounded,
     'topic' => Icons.tag_rounded,
     'payload' => Icons.data_object_rounded,
+    'entityId' || 'entity_id' => Icons.devices_other_rounded,
+    'server' => Icons.dns_outlined,
+    'domain' || 'service' || 'action' => Icons.home_work_outlined,
     _ => Icons.tune_rounded,
   };
+}
+
+class _NodeValueEditResult {
+  const _NodeValueEditResult(this.value);
+  final dynamic value;
+}
+
+class _NodeValueEditor extends StatefulWidget {
+  const _NodeValueEditor({required this.title, required this.initialValue});
+
+  final String title;
+  final dynamic initialValue;
+
+  @override
+  State<_NodeValueEditor> createState() => _NodeValueEditorState();
+}
+
+class _NodeValueEditorState extends State<_NodeValueEditor> {
+  late final TextEditingController _controller = TextEditingController(
+    text: const JsonEncoder.withIndent('  ').convert(widget.initialValue),
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    try {
+      Navigator.pop(
+        context,
+        _NodeValueEditResult(jsonDecode(_controller.text)),
+      );
+    } on FormatException catch (error) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('JSON 无效：${error.message}')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      leading: IconButton(
+        onPressed: () => Navigator.pop(context),
+        icon: const Icon(Icons.close_rounded),
+      ),
+      title: Text(widget.title),
+      actions: [TextButton(onPressed: _save, child: const Text('保存'))],
+      bottom: const PreferredSize(
+        preferredSize: Size.fromHeight(32),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '编辑此属性的 JSON 值',
+              style: TextStyle(fontSize: 11, color: RivlenColors.muted),
+            ),
+          ),
+        ),
+      ),
+    ),
+    body: SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: TextField(
+          controller: _controller,
+          expands: true,
+          minLines: null,
+          maxLines: null,
+          autocorrect: false,
+          enableSuggestions: false,
+          keyboardType: TextInputType.multiline,
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 13,
+            height: 1.5,
+            color: RivlenColors.ink,
+          ),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: RivlenColors.surface,
+            contentPadding: const EdgeInsets.all(16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: RivlenColors.line),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: RivlenColors.line),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _EditorActionTile extends StatelessWidget {
@@ -1875,4 +2158,9 @@ String _preview(String value) {
   final compact = value.trim().replaceAll('\n', ' ');
   if (compact.isEmpty) return '未设置';
   return compact.length > 68 ? '${compact.substring(0, 68)}…' : compact;
+}
+
+String _previewJson(dynamic value) {
+  final text = value == null ? 'null' : jsonEncode(value);
+  return _preview(text);
 }

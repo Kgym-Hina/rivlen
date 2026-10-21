@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../data/node_catalog.dart';
@@ -28,6 +30,7 @@ class FlowCanvas extends StatefulWidget {
     required this.selectedNodeId,
     required this.selectedLink,
     required this.onSelectNode,
+    required this.onClearSelection,
     required this.onEditNode,
     required this.onMoveNode,
     required this.onMoveEnd,
@@ -42,6 +45,7 @@ class FlowCanvas extends StatefulWidget {
   final String? selectedNodeId;
   final FlowLink? selectedLink;
   final ValueChanged<String> onSelectNode;
+  final VoidCallback onClearSelection;
   final ValueChanged<String> onEditNode;
   final void Function(String id, Offset delta) onMoveNode;
   final VoidCallback onMoveEnd;
@@ -70,6 +74,7 @@ class FlowCanvasState extends State<FlowCanvas> {
   bool _moved = false;
   bool _moveStarted = false;
   bool _viewInitialized = false;
+  bool _compactLayout = false;
   String? _dragNodeId;
   FlowLink? _pickedLink;
   _PortHit? _pickedPort;
@@ -90,10 +95,10 @@ class FlowCanvasState extends State<FlowCanvas> {
   void resetView() {
     if (_viewportSize == null) return;
     final size = _viewportSize!;
-    final positioned = widget.nodes.where(
-      (node) =>
-          node['x'] is num && node['y'] is num && node['type'] != 'comment',
-    );
+    final positioned = _placedNodesFor(
+      widget.nodes,
+      compact: _compactLayout,
+    ).where((item) => item.node['type'] != 'comment').toList(growable: false);
     if (positioned.isEmpty) {
       setState(() {
         _scale = 1;
@@ -102,17 +107,15 @@ class FlowCanvasState extends State<FlowCanvas> {
       });
       return;
     }
-    var minX = double.infinity;
-    var minY = double.infinity;
-    var maxX = -double.infinity;
-    var maxY = -double.infinity;
-    for (final node in positioned) {
-      final x = (node['x'] as num).toDouble();
-      final y = (node['y'] as num).toDouble();
-      minX = minX < x ? minX : x;
-      minY = minY < y ? minY : y;
-      maxX = maxX > x ? maxX : x;
-      maxY = maxY > y ? maxY : y;
+    var minX = positioned.first.rect.left;
+    var minY = positioned.first.rect.top;
+    var maxX = positioned.first.rect.right;
+    var maxY = positioned.first.rect.bottom;
+    for (final item in positioned.skip(1)) {
+      minX = math.min(minX, item.rect.left);
+      minY = math.min(minY, item.rect.top);
+      maxX = math.max(maxX, item.rect.right);
+      maxY = math.max(maxY, item.rect.bottom);
     }
     const marginX = 160.0;
     const marginY = 140.0;
@@ -126,8 +129,8 @@ class FlowCanvasState extends State<FlowCanvas> {
       _scale = scale.toDouble();
       _viewInitialized = true;
       _translation = Offset(
-        (size.width - (maxX - minX) * _scale) / 2 - minX * _scale,
-        (size.height - (maxY - minY) * _scale) / 2 - minY * _scale,
+        size.width / 2 - (minX + maxX) / 2 * _scale,
+        size.height / 2 - (minY + maxY) / 2 * _scale,
       );
     });
   }
@@ -135,9 +138,10 @@ class FlowCanvasState extends State<FlowCanvas> {
   void focusNode(String id) {
     final size = _viewportSize;
     if (size == null) return;
-    final item = _placedNodesFor(widget.nodes)
-        .where((entry) => entry.node['id'].toString() == id)
-        .firstOrNull;
+    final item = _placedNodesFor(
+      widget.nodes,
+      compact: _compactLayout,
+    ).where((entry) => entry.node['id'].toString() == id).firstOrNull;
     if (item == null) return;
     setState(
       () => _translation = size.center(Offset.zero) - item.rect.center * _scale,
@@ -147,7 +151,7 @@ class FlowCanvasState extends State<FlowCanvas> {
   Offset _toWorld(Offset point) => (point - _translation) / _scale;
 
   _PortHit? _portAt(Offset local) {
-    final placed = _placedNodesFor(widget.nodes);
+    final placed = _placedNodesFor(widget.nodes, compact: _compactLayout);
     for (final item in placed.reversed) {
       final node = item.node;
       final center = item.rect.center;
@@ -177,14 +181,17 @@ class FlowCanvasState extends State<FlowCanvas> {
 
   _PlacedNode? _nodeAt(Offset local) {
     final world = _toWorld(local);
-    for (final item in _placedNodesFor(widget.nodes).reversed) {
+    for (final item in _placedNodesFor(
+      widget.nodes,
+      compact: _compactLayout,
+    ).reversed) {
       if (item.rect.inflate(8).contains(world)) return item;
     }
     return null;
   }
 
   FlowLink? _linkAt(Offset local) {
-    final items = _placedNodesFor(widget.nodes);
+    final items = _placedNodesFor(widget.nodes, compact: _compactLayout);
     final byId = {for (final item in items) item.node['id'].toString(): item};
     for (final item in items.reversed) {
       final wires = item.node['wires'];
@@ -410,8 +417,9 @@ class FlowCanvasState extends State<FlowCanvas> {
     if (nodeId != null) {
       widget.onSelectNode(nodeId);
       if (isDoubleTap) widget.onEditNode(nodeId);
-    } else if (isDoubleTap) {
-      widget.onAddAtPoint(world);
+    } else {
+      widget.onClearSelection();
+      if (isDoubleTap) widget.onAddAtPoint(world);
     }
   }
 
@@ -419,6 +427,11 @@ class FlowCanvasState extends State<FlowCanvas> {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+      final compact = constraints.maxWidth < 700;
+      if (_compactLayout != compact) {
+        _compactLayout = compact;
+        _viewInitialized = false;
+      }
       if (!_viewInitialized && widget.nodes.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && !_viewInitialized) resetView();
@@ -443,6 +456,7 @@ class FlowCanvasState extends State<FlowCanvas> {
                 pendingOutputIndex: _pendingOutputIndex,
                 previewSource: _wireSource,
                 previewPoint: _previewPoint,
+                compactLayout: _compactLayout,
               ),
             ),
           ),
@@ -542,24 +556,64 @@ class _PlacedNode {
   final int index;
 }
 
-List<_PlacedNode> _placedNodesFor(List<FlowNode> nodes) =>
-    List.generate(nodes.length, (index) {
-      final node = nodes[index];
-      final x = node['x'] is num
-          ? (node['x'] as num).toDouble()
-          : 180.0 + index * 220;
-      final y = node['y'] is num
-          ? (node['y'] as num).toDouble()
-          : 180.0 + (index % 3) * 100;
-      final width = node['type'] == 'comment' ? 200.0 : 184.0;
-      final height = node['type'] == 'comment' ? 48.0 : 68.0;
-      final rect = Rect.fromCenter(
-        center: Offset(x, y),
-        width: width,
-        height: height,
-      );
-      return _PlacedNode(node, rect, index);
-    });
+List<_PlacedNode> _placedNodesFor(
+  List<FlowNode> nodes, {
+  bool compact = false,
+}) {
+  final placed = <_PlacedNode>[];
+  for (var index = 0; index < nodes.length; index++) {
+    final node = nodes[index];
+    final x = node['x'] is num
+        ? (node['x'] as num).toDouble()
+        : 180.0 + index * 220;
+    final y = node['y'] is num
+        ? (node['y'] as num).toDouble()
+        : 180.0 + (index % 3) * 100;
+    final width = node['type'] == 'comment' ? 200.0 : 184.0;
+    final height = node['type'] == 'comment' ? 48.0 : 68.0;
+    final center = compact
+        ? _collisionFreeCenter(Offset(x, y), width, height, placed)
+        : Offset(x, y);
+    final rect = Rect.fromCenter(center: center, width: width, height: height);
+    placed.add(_PlacedNode(node, rect, index));
+  }
+  return placed;
+}
+
+Offset _collisionFreeCenter(
+  Offset requested,
+  double width,
+  double height,
+  List<_PlacedNode> placed,
+) {
+  const gapX = 28.0;
+  const gapY = 24.0;
+  const clearance = 8.0;
+  var candidate = requested;
+  for (var attempt = 0; attempt < 64; attempt++) {
+    final rect = Rect.fromCenter(
+      center: candidate,
+      width: width,
+      height: height,
+    );
+    final collisions = placed
+        .where((item) => item.rect.inflate(clearance / 2).overlaps(rect))
+        .toList(growable: false);
+    if (collisions.isEmpty) return candidate;
+
+    final lowest = collisions.reduce(
+      (a, b) => a.rect.bottom > b.rect.bottom ? a : b,
+    );
+    candidate = Offset(
+      candidate.dx,
+      math.max(candidate.dy, lowest.rect.bottom + gapY + height / 2),
+    );
+    if (attempt == 8) {
+      candidate = Offset(requested.dx + width + gapX, requested.dy);
+    }
+  }
+  return candidate;
+}
 
 Offset _outputWorld(_PlacedNode item, int outputIndex) => Offset(
   item.rect.right,
@@ -590,6 +644,7 @@ class _FlowCanvasPainter extends CustomPainter {
     required this.pendingOutputIndex,
     required this.previewSource,
     required this.previewPoint,
+    required this.compactLayout,
   });
 
   final List<FlowNode> nodes;
@@ -601,12 +656,13 @@ class _FlowCanvasPainter extends CustomPainter {
   final int pendingOutputIndex;
   final _PortHit? previewSource;
   final Offset? previewPoint;
+  final bool compactLayout;
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawColor(RivlenColors.canvas, BlendMode.src);
     _drawGrid(canvas, size);
-    final items = _placedNodesFor(nodes);
+    final items = _placedNodesFor(nodes, compact: compactLayout);
     final byId = {for (final item in items) item.node['id'].toString(): item};
     canvas.save();
     canvas.translate(translation.dx, translation.dy);
@@ -708,15 +764,13 @@ class _FlowCanvasPainter extends CustomPainter {
       RRect.fromRectAndRadius(iconRect, const Radius.circular(11)),
       Paint()..color = color.withValues(alpha: 0.1),
     );
-    _drawText(
+    _drawCenteredText(
       canvas,
       nodeColor(type).glyph,
-      Offset(iconRect.left, iconRect.top + 5),
+      iconRect,
       color,
       18,
       fontWeight: FontWeight.w700,
-      width: iconRect.width,
-      align: TextAlign.center,
     );
     final title = nodeTitle(node);
     final subtitle = nodeSubtitle(node);
@@ -802,6 +856,33 @@ class _FlowCanvasPainter extends CustomPainter {
     painter.paint(canvas, offset);
   }
 
+  void _drawCenteredText(
+    Canvas canvas,
+    String text,
+    Rect rect,
+    Color color,
+    double fontSize, {
+    FontWeight fontWeight = FontWeight.w400,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          height: 1,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+    )..layout(maxWidth: rect.width);
+    painter.paint(
+      canvas,
+      Offset(rect.left, rect.top + (rect.height - painter.height) / 2),
+    );
+  }
+
   @override
   bool shouldRepaint(covariant _FlowCanvasPainter oldDelegate) =>
       oldDelegate.nodes != nodes ||
@@ -810,7 +891,8 @@ class _FlowCanvasPainter extends CustomPainter {
       oldDelegate.selectedNodeId != selectedNodeId ||
       oldDelegate.selectedLink != selectedLink ||
       oldDelegate.pendingSourceId != pendingSourceId ||
-      oldDelegate.previewPoint != previewPoint;
+      oldDelegate.previewPoint != previewPoint ||
+      oldDelegate.compactLayout != compactLayout;
 }
 
 class _EmptyCanvasHint extends StatelessWidget {

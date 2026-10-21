@@ -42,14 +42,34 @@ String createNodeId() =>
 String createLocalId() =>
     '${DateTime.now().microsecondsSinceEpoch.toRadixString(16)}${List.generate(4, (_) => _random.nextInt(16).toRadixString(16)).join()}';
 
-String nodeTitle(FlowNode node) =>
-    (node['name'] as String?)?.trim().isNotEmpty == true
-    ? (node['name'] as String).trim()
-    : nodeKinds
-              .where((item) => item.type == node['type'])
-              .map((item) => item.title)
-              .firstOrNull ??
-          (node['type']?.toString() ?? 'Node');
+String nodeTitle(FlowNode node) {
+  final name = node['name']?.toString().trim() ?? '';
+  if (name.isNotEmpty) return name;
+  final label = node['label']?.toString().trim() ?? '';
+  if (label.isNotEmpty) return label;
+  return nodeTypeLabel(node['type']?.toString() ?? 'Node');
+}
+
+String nodeTypeLabel(String type) {
+  final known = nodeKinds
+      .where((item) => item.type == type)
+      .map((item) => item.title)
+      .firstOrNull;
+  if (known != null) return known;
+  final words = type
+      .replaceAll(RegExp(r'([a-z0-9])([A-Z])'), r'$1 $2')
+      .replaceAll(RegExp(r'[-_.]+'), ' ')
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((word) => word.isNotEmpty)
+      .map(
+        (word) => word.length == 1
+            ? word.toUpperCase()
+            : '${word[0].toUpperCase()}${word.substring(1)}',
+      )
+      .join(' ');
+  return words.isEmpty ? 'Node' : words;
+}
 
 String nodeSubtitle(FlowNode node) {
   final type = node['type']?.toString() ?? '';
@@ -65,11 +85,44 @@ String nodeSubtitle(FlowNode node) {
         ? node['topic'].toString()
         : '未设置主题';
   }
-  return nodeKinds
-          .where((item) => item.type == type)
-          .map((item) => item.title)
-          .firstOrNull ??
-      type;
+  final domain = node['domain']?.toString().trim() ?? '';
+  final service = node['service']?.toString().trim() ?? '';
+  final action = node['action']?.toString().trim() ?? '';
+  final entity = _firstNonEmpty([
+    node['entityId'],
+    node['entity_id'],
+    node['entity'],
+    node['deviceId'],
+    node['device_id'],
+    node['topic'],
+    node['url'],
+    node['path'],
+    node['property'],
+  ]);
+  if (domain.isNotEmpty && service.isNotEmpty) return '$domain.$service';
+  if (action.isNotEmpty) return action;
+  if (entity != null) return entity;
+  final detail = _firstScalarDetail(node);
+  return detail ?? nodeTypeLabel(type);
+}
+
+String? _firstNonEmpty(Iterable<dynamic> values) {
+  for (final value in values) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isNotEmpty) return text;
+  }
+  return null;
+}
+
+String? _firstScalarDetail(FlowNode node) {
+  const ignored = {'id', 'type', 'z', 'x', 'y', 'wires', 'name', 'label'};
+  for (final entry in node.entries) {
+    if (ignored.contains(entry.key)) continue;
+    final value = entry.value;
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    if (value is num) return value.toString();
+  }
+  return null;
 }
 
 int nodeOutputCount(FlowNode node) {
@@ -324,6 +377,54 @@ List<String> editableFields(FlowNode node) {
     default:
       return [];
   }
+}
+
+const _nodeEditorStructuralFields = {'id', 'type', 'z', 'x', 'y', 'wires'};
+const _nodeEditorSpecialFields = {'func', 'template', 'info'};
+
+/// Returns scalar properties that can be edited without knowing a node's
+/// package in advance. This lets Home Assistant and third-party nodes expose
+/// their ordinary string, number, and boolean settings automatically.
+List<String> nodeEditorFields(FlowNode node) {
+  final fields = <String>[];
+  void add(String field) {
+    if (fields.contains(field)) return;
+    if (_nodeEditorStructuralFields.contains(field) ||
+        (_nodeEditorSpecialFields.contains(field) &&
+            complexField(node) == field) ||
+        field == 'name' ||
+        field.startsWith('__')) {
+      return;
+    }
+    final value = node[field];
+    if (value is String || value is num || value is bool) fields.add(field);
+  }
+
+  for (final field in editableFields(node)) {
+    add(field);
+  }
+  for (final field in node.keys) {
+    add(field);
+  }
+  return fields;
+}
+
+/// Returns structured properties (arrays, objects, and null values) that are
+/// edited through a field-level JSON editor rather than the whole node JSON.
+List<String> nodeStructuredFields(FlowNode node) {
+  final fields = <String>[];
+  for (final field in node.keys) {
+    if (_nodeEditorStructuralFields.contains(field) ||
+        (_nodeEditorSpecialFields.contains(field) &&
+            complexField(node) == field) ||
+        field == 'name' ||
+        field.startsWith('__')) {
+      continue;
+    }
+    final value = node[field];
+    if (value is List || value is Map || value == null) fields.add(field);
+  }
+  return fields;
 }
 
 String? complexField(FlowNode node) {
