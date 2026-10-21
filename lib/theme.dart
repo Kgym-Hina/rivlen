@@ -114,8 +114,16 @@ ThemeData buildRivlenTheme() {
     dividerTheme: DividerThemeData(color: RivlenColors.line),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: RivlenColors.ink,
-      contentTextStyle: TextStyle(color: Colors.white, fontSize: 13),
+      backgroundColor: RivlenColors.isDark
+          ? const Color(0xFF332A28)
+          : RivlenColors.ink,
+      contentTextStyle: TextStyle(
+        color: RivlenColors.isDark ? RivlenColors.ink : Colors.white,
+        fontSize: 13,
+      ),
+      actionTextColor: RivlenColors.isDark
+          ? RivlenColors.coral
+          : const Color(0xFFFFD0C8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
   );
