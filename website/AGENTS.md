@@ -18,3 +18,5 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Use scroll-driven pinned scenes for the node canvas: draw connections, send messages along wires, and reveal Debug feedback. Keep marketing copy short.
 
 - Device actions should have visible physical feedback (light glow, dimmer, fan, temperature) synchronized to the scroll timeline. Use native sticky chapters with stable svh heights; avoid ScrollTrigger pin spacers and scroll distances based on changing mobile innerHeight.
+
+- The /gateway subpage is the bilingual installation and pairing guide. Its copyable AI prompt must use public source and selected deployment options, without user-specific hosts or credentials. Keep its steps aligned with gateway/ source, especially Docker vs native environment variables and Home Assistant basic authentication.

@@ -31,6 +31,13 @@
 - Replaced all three ScrollTrigger pins with CSS sticky scenes inside preallocated chapters. Animation distances use chapter minus scene height, and stable `svh` dimensions replace changing `innerHeight` distances. Mobile toolbar height-only resize refreshes are ignored; product images declare intrinsic dimensions.
 - Browser QA at 390 × 844 and 375 × 667: device feedback and form remain visible; forward/backward scrolling across scene boundaries produced zero deviation from the expected sticky position in the sampled DOM measurements, with no pin spacers. This is responsive Chromium QA; physical iPhone Safari toolbar behavior has not been verified on-device.
 
+## Gateway guide pass
+
+- Added /gateway with an AI deployment prompt at the top, six manual setup steps, Docker/native Go and LAN/HTTPS choices, four authentication modes, code copy controls, pairing instructions, troubleshooting, and persistence notes.
+- Checked prompt copy success, configuration changes for Home Assistant basic authentication and HTTPS, native environment/start command selection, and prompt synchronization with selections.
+- Reviewed desktop Chinese and 390 × 844 English layouts. Added higher-contrast wine accents for the guide’s dark theme. Code blocks scroll internally and do not widen the page.
+- Instructions were checked against gateway source. Compose now forwards RIVLEN_NODE_RED_AUTH_MODE; the guide also provides an override for older checkouts. No gateway was installed or changed on a remote server during this work.
+
 ## Findings
 
 No actionable P0, P1, or P2 differences remain.

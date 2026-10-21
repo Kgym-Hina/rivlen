@@ -155,7 +155,7 @@ const copy = {
 };
 
 function App() {
-  const [language, setLanguage] = useState('zh');
+  const [language, setLanguage] = useState(() => new URLSearchParams(window.location.search).get('lang') === 'en' ? 'en' : 'zh');
   const [darkMode, setDarkMode] = useState(false);
   const t = useMemo(() => copy[language], [language]);
   const nodeGlyphs = [FlowArrow, SlidersHorizontal, Broadcast, Bug];
@@ -305,7 +305,7 @@ function App() {
         <nav className="nav-links" aria-label="Primary navigation">
           <button type="button" onClick={() => scrollTo('experience')}>{t.nav.experience}</button>
           <button type="button" onClick={() => scrollTo('features')}>{t.nav.features}</button>
-          <button type="button" onClick={() => scrollTo('download')}>{t.nav.download}</button>
+          <a href={`/gateway?lang=${language}`}>{language === 'zh' ? '网关安装' : 'Gateway setup'}</a><button type="button" onClick={() => scrollTo('download')}>{t.nav.download}</button>
         </nav>
         <div className="nav-tools">
           <button className="icon-button" type="button" onClick={() => setDarkMode((value) => !value)} aria-label={t.theme}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
@@ -330,7 +330,7 @@ function App() {
 
         <div className="scroll-chapter debug-chapter"><section className="debug-section"><img className="debug-atmosphere" src="/assets/debug-atmosphere.png" alt="" aria-hidden="true" /><div className="debug-inner section-shell"><div className="debug-copy reveal"><div className="eyebrow eyebrow-light"><span className="eyebrow-dot" />{t.debug.eyebrow}</div><h2>{t.debug.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.debug.body}</p><div className="debug-message"><span className="debug-pulse" /><span>{t.debug.pulse}</span><ArrowUpRight size={16} /></div></div><div className="debug-console"><div className="console-header"><span><Bug size={18} weight="fill" />Debug</span><span className="console-live"><i />LIVE</span></div><div className="console-lines">{t.debug.log.map((line) => <code key={line}>{line}</code>)}</div><div className="console-foot"><Broadcast size={16} />{t.debug.note}</div></div></div></section></div>
 
-        <section className="gateway-section section-shell"><div className="gateway-art reveal"><div className="gateway-ring ring-one" /><div className="gateway-ring ring-two" /><div className="gateway-core"><QrCode size={54} weight="thin" /><span>Rivlen Gateway</span></div><div className="gateway-node node-a"><span />Node-RED</div><div className="gateway-node node-b"><LockKey size={15} />Private</div><div className="gateway-node node-c"><span />Phone</div></div><div className="gateway-copy reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.gateway.eyebrow}</div><h2>{t.gateway.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.gateway.body}</p><ul>{t.gateway.points.map((point) => <li key={point}><Check size={16} weight="bold" />{point}</li>)}</ul><button className="text-link" type="button" onClick={() => scrollTo('download')}>{t.gateway.cta}<ArrowRight size={17} /></button></div></section>
+        <section className="gateway-section section-shell"><div className="gateway-art reveal"><div className="gateway-ring ring-one" /><div className="gateway-ring ring-two" /><div className="gateway-core"><QrCode size={54} weight="thin" /><span>Rivlen Gateway</span></div><div className="gateway-node node-a"><span />Node-RED</div><div className="gateway-node node-b"><LockKey size={15} />Private</div><div className="gateway-node node-c"><span />Phone</div></div><div className="gateway-copy reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.gateway.eyebrow}</div><h2>{t.gateway.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.gateway.body}</p><ul>{t.gateway.points.map((point) => <li key={point}><Check size={16} weight="bold" />{point}</li>)}</ul><a className="text-link" href={`/gateway?lang=${language}`}>{t.gateway.cta}<ArrowRight size={17} /></a></div></section>
 
         <section id="download" className="download-section section-shell"><div className="download-copy reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.download.eyebrow}</div><h2>{t.download.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.download.body}</p></div><div className="download-panel reveal"><DownloadButton icon={<GooglePlayLogo size={23} weight="fill" />} label={t.download.play} href={downloadLinks.play} unavailable={t.download.unavailable} /><DownloadButton icon={<AndroidLogo size={23} weight="fill" />} label={t.download.pgyer} href={downloadLinks.pgyer} unavailable={t.download.unavailable} /><DownloadButton icon={<AppleLogo size={23} weight="fill" />} label={t.download.ios} href={downloadLinks.ios} unavailable={t.download.unavailable} /></div><div className="download-foot"><span>{t.download.foot}</span><img className="footer-mark" src="/assets/rivlen-mark.svg" alt="" /></div></section>
       </main>
