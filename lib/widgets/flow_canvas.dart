@@ -1,0 +1,853 @@
+import 'package:flutter/material.dart';
+
+import '../data/node_catalog.dart';
+import '../models/flow_bundle.dart';
+import '../theme.dart';
+
+class FlowLink {
+  const FlowLink(this.sourceId, this.outputIndex, this.targetId);
+  final String sourceId;
+  final int outputIndex;
+  final String targetId;
+
+  @override
+  bool operator ==(Object other) =>
+      other is FlowLink &&
+      sourceId == other.sourceId &&
+      outputIndex == other.outputIndex &&
+      targetId == other.targetId;
+
+  @override
+  int get hashCode => Object.hash(sourceId, outputIndex, targetId);
+}
+
+class FlowCanvas extends StatefulWidget {
+  const FlowCanvas({
+    super.key,
+    required this.nodes,
+    required this.selectedNodeId,
+    required this.selectedLink,
+    required this.onSelectNode,
+    required this.onEditNode,
+    required this.onMoveNode,
+    required this.onMoveEnd,
+    required this.onConnect,
+    required this.onAddAtWireEnd,
+    required this.onAddAtPoint,
+    required this.onSelectLink,
+    required this.onFitBounds,
+  });
+
+  final List<FlowNode> nodes;
+  final String? selectedNodeId;
+  final FlowLink? selectedLink;
+  final ValueChanged<String> onSelectNode;
+  final ValueChanged<String> onEditNode;
+  final void Function(String id, Offset delta) onMoveNode;
+  final VoidCallback onMoveEnd;
+  final void Function(String source, int outputIndex, String target) onConnect;
+  final void Function(String source, int outputIndex, Offset worldPoint)
+  onAddAtWireEnd;
+  final ValueChanged<Offset> onAddAtPoint;
+  final ValueChanged<FlowLink> onSelectLink;
+  final VoidCallback onFitBounds;
+
+  @override
+  State<FlowCanvas> createState() => FlowCanvasState();
+}
+
+class FlowCanvasState extends State<FlowCanvas> {
+  static const _minimumScale = 0.38;
+  static const _maximumScale = 2.1;
+  double _scale = 1;
+  Offset _translation = Offset.zero;
+  Offset _lastLocal = Offset.zero;
+  Offset _startLocal = Offset.zero;
+  Offset _focalWorldAtPinch = Offset.zero;
+  double _pinchStartScale = 1;
+  double _pinchScaleAtStart = 1;
+  bool _pinching = false;
+  bool _moved = false;
+  bool _moveStarted = false;
+  bool _viewInitialized = false;
+  String? _dragNodeId;
+  FlowLink? _pickedLink;
+  _PortHit? _pickedPort;
+  _PortHit? _wireSource;
+  String? _pendingSourceId;
+  int _pendingOutputIndex = 0;
+  Offset? _previewPoint;
+  DateTime? _lastTapAt;
+  String? _lastTapNodeId;
+  Offset? _lastTapWorld;
+  Size? _viewportSize;
+
+  Offset get worldCenter {
+    final size = _viewportSize;
+    return size == null ? Offset.zero : _toWorld(size.center(Offset.zero));
+  }
+
+  void resetView() {
+    if (_viewportSize == null) return;
+    final size = _viewportSize!;
+    final positioned = widget.nodes.where(
+      (node) =>
+          node['x'] is num && node['y'] is num && node['type'] != 'comment',
+    );
+    if (positioned.isEmpty) {
+      setState(() {
+        _scale = 1;
+        _translation = Offset(size.width * 0.12, size.height * 0.24);
+        _viewInitialized = true;
+      });
+      return;
+    }
+    var minX = double.infinity;
+    var minY = double.infinity;
+    var maxX = -double.infinity;
+    var maxY = -double.infinity;
+    for (final node in positioned) {
+      final x = (node['x'] as num).toDouble();
+      final y = (node['y'] as num).toDouble();
+      minX = minX < x ? minX : x;
+      minY = minY < y ? minY : y;
+      maxX = maxX > x ? maxX : x;
+      maxY = maxY > y ? maxY : y;
+    }
+    const marginX = 160.0;
+    const marginY = 140.0;
+    final boundsWidth = (maxX - minX + marginX * 2).clamp(280.0, 3000.0);
+    final boundsHeight = (maxY - minY + marginY * 2).clamp(220.0, 2200.0);
+    final fitted = (size.width / boundsWidth).clamp(0.48, 1.15);
+    final scale = fitted < size.height / boundsHeight
+        ? fitted
+        : (size.height / boundsHeight).clamp(0.48, 1.15);
+    setState(() {
+      _scale = scale.toDouble();
+      _viewInitialized = true;
+      _translation = Offset(
+        (size.width - (maxX - minX) * _scale) / 2 - minX * _scale,
+        (size.height - (maxY - minY) * _scale) / 2 - minY * _scale,
+      );
+    });
+  }
+
+  void focusNode(String id) {
+    final size = _viewportSize;
+    if (size == null) return;
+    final item = _placedNodesFor(widget.nodes)
+        .where((entry) => entry.node['id'].toString() == id)
+        .firstOrNull;
+    if (item == null) return;
+    setState(
+      () => _translation = size.center(Offset.zero) - item.rect.center * _scale,
+    );
+  }
+
+  Offset _toWorld(Offset point) => (point - _translation) / _scale;
+
+  _PortHit? _portAt(Offset local) {
+    final placed = _placedNodesFor(widget.nodes);
+    for (final item in placed.reversed) {
+      final node = item.node;
+      final center = item.rect.center;
+      if (nodeHasInput(node)) {
+        final input = Offset(center.dx - item.rect.width / 2, center.dy);
+        if ((_screen(input) - local).distance <= 27) {
+          return _PortHit(node['id'].toString(), 0, false);
+        }
+      }
+      final outputs = nodeOutputCount(node);
+      if (outputs > 0 && nodeHasOutput(node)) {
+        for (var index = 0; index < outputs; index++) {
+          final output = Offset(
+            center.dx + item.rect.width / 2,
+            center.dy + _outputOffset(index, outputs),
+          );
+          if ((_screen(output) - local).distance <= 27) {
+            return _PortHit(node['id'].toString(), index, true);
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  Offset _screen(Offset world) => world * _scale + _translation;
+
+  _PlacedNode? _nodeAt(Offset local) {
+    final world = _toWorld(local);
+    for (final item in _placedNodesFor(widget.nodes).reversed) {
+      if (item.rect.inflate(8).contains(world)) return item;
+    }
+    return null;
+  }
+
+  FlowLink? _linkAt(Offset local) {
+    final items = _placedNodesFor(widget.nodes);
+    final byId = {for (final item in items) item.node['id'].toString(): item};
+    for (final item in items.reversed) {
+      final wires = item.node['wires'];
+      if (wires is! List) continue;
+      for (var output = 0; output < wires.length; output++) {
+        final targets = wires[output];
+        if (targets is! List) continue;
+        for (final target in targets) {
+          final to = byId[target?.toString()];
+          if (to == null) continue;
+          final fromPoint = _outputWorld(item, output);
+          final toPoint = Offset(to.rect.left, to.rect.center.dy);
+          final start = _screen(fromPoint);
+          final end = _screen(toPoint);
+          final path = _wirePath(start, end);
+          for (var sample = 0; sample <= 20; sample++) {
+            final point = path
+                .computeMetrics()
+                .first
+                .getTangentForOffset(
+                  path.computeMetrics().first.length * sample / 20,
+                )
+                ?.position;
+            if (point != null && (point - local).distance < 14) {
+              return FlowLink(
+                item.node['id'].toString(),
+                output,
+                target.toString(),
+              );
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  void _onScaleStart(ScaleStartDetails details) {
+    final local = details.localFocalPoint;
+    _startLocal = local;
+    _lastLocal = local;
+    _moved = false;
+    _moveStarted = false;
+    _pinching = false;
+    _dragNodeId = null;
+    _pickedPort = _portAt(local);
+    _wireSource = null;
+    _pickedLink = null;
+
+    final port = _pickedPort;
+    if (port != null && port.output) {
+      _wireSource = port;
+      return;
+    }
+    if (port != null && !port.output && _pendingSourceId != null) {
+      _wireSource = _PortHit(_pendingSourceId!, _pendingOutputIndex, true);
+      return;
+    }
+    final link = _linkAt(local);
+    if (link != null) {
+      _pickedLink = link;
+      return;
+    }
+    final node = _nodeAt(local);
+    if (node != null && (port == null || !port.output)) {
+      _dragNodeId = node.node['id'].toString();
+    }
+  }
+
+  void _onScaleUpdate(ScaleUpdateDetails details) {
+    final local = details.localFocalPoint;
+    if (details.pointerCount > 1) {
+      if (!_pinching) {
+        _pinching = true;
+        _pinchStartScale = _scale;
+        _pinchScaleAtStart = details.scale;
+        _focalWorldAtPinch = _toWorld(local);
+        _dragNodeId = null;
+        _wireSource = null;
+      }
+      final factor = details.scale / _pinchScaleAtStart;
+      final nextScale = (_pinchStartScale * factor).clamp(
+        _minimumScale,
+        _maximumScale,
+      );
+      setState(() {
+        _scale = nextScale.toDouble();
+        _translation = local - _focalWorldAtPinch * _scale;
+        _lastLocal = local;
+      });
+      return;
+    }
+    if (_pinching) {
+      _pinching = false;
+      _lastLocal = local;
+      _startLocal = local;
+      return;
+    }
+    final delta = local - _lastLocal;
+    if ((local - _startLocal).distance > 5) _moved = true;
+    _lastLocal = local;
+
+    if (_wireSource != null) {
+      setState(() => _previewPoint = local);
+      return;
+    }
+    if (_dragNodeId != null) {
+      if (_moved) {
+        final movement = _moveStarted ? delta : local - _startLocal;
+        if (movement.distance > 0) {
+          widget.onMoveNode(_dragNodeId!, movement / _scale);
+        }
+        _moveStarted = true;
+      }
+      return;
+    }
+    if (_pickedLink != null) return;
+    if (delta.distance > 0) {
+      setState(() => _translation += delta);
+    }
+  }
+
+  void _onScaleEnd(ScaleEndDetails details) {
+    if (_pinching) {
+      _pinching = false;
+      _previewPoint = null;
+      return;
+    }
+    final local = _lastLocal;
+    if (_wireSource != null) {
+      final source = _wireSource!;
+      _previewPoint = null;
+      if (_moved) {
+        final endPort = _portAt(local);
+        if (endPort != null &&
+            !endPort.output &&
+            endPort.nodeId != source.nodeId) {
+          widget.onConnect(source.nodeId, source.outputIndex, endPort.nodeId);
+          setState(() {
+            _pendingSourceId = null;
+            _wireSource = null;
+          });
+          return;
+        }
+        final endNode = _nodeAt(local);
+        if (endNode == null) {
+          widget.onAddAtWireEnd(
+            source.nodeId,
+            source.outputIndex,
+            _toWorld(local),
+          );
+          setState(() {
+            _pendingSourceId = null;
+            _wireSource = null;
+          });
+          return;
+        }
+        setState(() {
+          _pendingSourceId = source.nodeId;
+          _pendingOutputIndex = source.outputIndex;
+          _wireSource = null;
+        });
+        return;
+      }
+      if (_pickedPort != null && _pickedPort!.output) {
+        setState(() {
+          if (_pendingSourceId == source.nodeId &&
+              _pendingOutputIndex == source.outputIndex) {
+            _pendingSourceId = null;
+          } else {
+            _pendingSourceId = source.nodeId;
+            _pendingOutputIndex = source.outputIndex;
+          }
+          _wireSource = null;
+        });
+        return;
+      }
+    }
+
+    final port = _pickedPort;
+    if (port != null && !port.output && _pendingSourceId != null) {
+      widget.onConnect(_pendingSourceId!, _pendingOutputIndex, port.nodeId);
+      setState(() {
+        _pendingSourceId = null;
+        _wireSource = null;
+      });
+      return;
+    }
+
+    if (!_moved && _pickedLink != null) {
+      widget.onSelectLink(_pickedLink!);
+      return;
+    }
+    if (_dragNodeId != null) {
+      if (_moveStarted) {
+        widget.onMoveEnd();
+      } else {
+        _handleTap(_dragNodeId, _toWorld(local));
+      }
+      return;
+    }
+    if (!_moved) _handleTap(null, _toWorld(local));
+    if (mounted) {
+      setState(() {
+        _wireSource = null;
+        _previewPoint = null;
+      });
+    }
+  }
+
+  void _handleTap(String? nodeId, Offset world) {
+    final now = DateTime.now();
+    final sameTarget =
+        nodeId == _lastTapNodeId &&
+        (_lastTapWorld == null || (_lastTapWorld! - world).distance < 42);
+    final isDoubleTap =
+        _lastTapAt != null &&
+        now.difference(_lastTapAt!) < const Duration(milliseconds: 380) &&
+        sameTarget;
+    _lastTapAt = now;
+    _lastTapNodeId = nodeId;
+    _lastTapWorld = world;
+    if (nodeId != null) {
+      widget.onSelectNode(nodeId);
+      if (isDoubleTap) widget.onEditNode(nodeId);
+    } else if (isDoubleTap) {
+      widget.onAddAtPoint(world);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+      if (!_viewInitialized && widget.nodes.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_viewInitialized) resetView();
+        });
+      }
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onScaleStart: _onScaleStart,
+            onScaleUpdate: _onScaleUpdate,
+            onScaleEnd: _onScaleEnd,
+            child: CustomPaint(
+              painter: _FlowCanvasPainter(
+                nodes: widget.nodes,
+                scale: _scale,
+                translation: _translation,
+                selectedNodeId: widget.selectedNodeId,
+                selectedLink: widget.selectedLink,
+                pendingSourceId: _pendingSourceId,
+                pendingOutputIndex: _pendingOutputIndex,
+                previewSource: _wireSource,
+                previewPoint: _previewPoint,
+              ),
+            ),
+          ),
+          if (widget.nodes.isEmpty)
+            Positioned(
+              left: 24,
+              right: 24,
+              top: constraints.maxHeight * 0.32,
+              child: const _EmptyCanvasHint(),
+            ),
+          Positioned(
+            right: 17,
+            bottom: 17,
+            child: Material(
+              color: RivlenColors.surface,
+              borderRadius: BorderRadius.circular(17),
+              elevation: 1,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: '缩小',
+                    onPressed: () => _zoom(0.83),
+                    icon: const Icon(Icons.remove_rounded, size: 20),
+                  ),
+                  Container(width: 1, height: 18, color: RivlenColors.line),
+                  IconButton(
+                    tooltip: '适应画布',
+                    onPressed: widget.onFitBounds,
+                    icon: const Icon(
+                      Icons.center_focus_strong_rounded,
+                      size: 17,
+                    ),
+                  ),
+                  Container(width: 1, height: 18, color: RivlenColors.line),
+                  IconButton(
+                    tooltip: '放大',
+                    onPressed: () => _zoom(1.2),
+                    icon: const Icon(Icons.add_rounded, size: 20),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_pendingSourceId != null)
+            Positioned(
+              left: 14,
+              right: 14,
+              top: 14,
+              child: IgnorePointer(
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: RivlenColors.ink.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Text(
+                      '选择一个输入端口',
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+
+  void _zoom(double factor) {
+    final size = _viewportSize;
+    if (size == null) return;
+    final anchor = size.center(Offset.zero);
+    final world = _toWorld(anchor);
+    setState(() {
+      _scale = (_scale * factor).clamp(_minimumScale, _maximumScale);
+      _translation = anchor - world * _scale;
+    });
+  }
+}
+
+class _PortHit {
+  const _PortHit(this.nodeId, this.outputIndex, this.output);
+  final String nodeId;
+  final int outputIndex;
+  final bool output;
+}
+
+class _PlacedNode {
+  const _PlacedNode(this.node, this.rect, this.index);
+  final FlowNode node;
+  final Rect rect;
+  final int index;
+}
+
+List<_PlacedNode> _placedNodesFor(List<FlowNode> nodes) =>
+    List.generate(nodes.length, (index) {
+      final node = nodes[index];
+      final x = node['x'] is num
+          ? (node['x'] as num).toDouble()
+          : 180.0 + index * 220;
+      final y = node['y'] is num
+          ? (node['y'] as num).toDouble()
+          : 180.0 + (index % 3) * 100;
+      final width = node['type'] == 'comment' ? 200.0 : 184.0;
+      final height = node['type'] == 'comment' ? 48.0 : 68.0;
+      final rect = Rect.fromCenter(
+        center: Offset(x, y),
+        width: width,
+        height: height,
+      );
+      return _PlacedNode(node, rect, index);
+    });
+
+Offset _outputWorld(_PlacedNode item, int outputIndex) => Offset(
+  item.rect.right,
+  item.rect.center.dy + _outputOffset(outputIndex, nodeOutputCount(item.node)),
+);
+
+double _outputOffset(int index, int count) {
+  if (count <= 1) return 0;
+  return (index - (count - 1) / 2) * 12;
+}
+
+Path _wirePath(Offset start, Offset end) {
+  final dx = (end.dx - start.dx).abs();
+  final bend = dx * 0.48 < 78 ? 78.0 : dx * 0.48;
+  return Path()
+    ..moveTo(start.dx, start.dy)
+    ..cubicTo(start.dx + bend, start.dy, end.dx - bend, end.dy, end.dx, end.dy);
+}
+
+class _FlowCanvasPainter extends CustomPainter {
+  const _FlowCanvasPainter({
+    required this.nodes,
+    required this.scale,
+    required this.translation,
+    required this.selectedNodeId,
+    required this.selectedLink,
+    required this.pendingSourceId,
+    required this.pendingOutputIndex,
+    required this.previewSource,
+    required this.previewPoint,
+  });
+
+  final List<FlowNode> nodes;
+  final double scale;
+  final Offset translation;
+  final String? selectedNodeId;
+  final FlowLink? selectedLink;
+  final String? pendingSourceId;
+  final int pendingOutputIndex;
+  final _PortHit? previewSource;
+  final Offset? previewPoint;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawColor(RivlenColors.canvas, BlendMode.src);
+    _drawGrid(canvas, size);
+    final items = _placedNodesFor(nodes);
+    final byId = {for (final item in items) item.node['id'].toString(): item};
+    canvas.save();
+    canvas.translate(translation.dx, translation.dy);
+    canvas.scale(scale);
+    for (final item in items) {
+      _drawWires(canvas, item, byId);
+    }
+    if (previewSource != null && previewPoint != null) {
+      final item = byId[previewSource!.nodeId];
+      if (item != null) {
+        final start = _outputWorld(item, previewSource!.outputIndex);
+        final previewWorld = (previewPoint! - translation) / scale;
+        final path = _wirePath(start, previewWorld);
+        canvas.drawPath(
+          path,
+          Paint()
+            ..color = RivlenColors.coral
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+    }
+    for (final item in items) {
+      _drawNode(canvas, item);
+    }
+    canvas.restore();
+  }
+
+  void _drawGrid(Canvas canvas, Size size) {
+    const spacing = 24.0;
+    final paint = Paint()
+      ..color = const Color(0xFFD9D2CC).withValues(alpha: 0.58);
+    for (double x = 12; x < size.width; x += spacing) {
+      for (double y = 12; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), 0.8, paint);
+      }
+    }
+  }
+
+  void _drawWires(
+    Canvas canvas,
+    _PlacedNode item,
+    Map<String, _PlacedNode> byId,
+  ) {
+    final wires = item.node['wires'];
+    if (wires is! List) return;
+    for (var output = 0; output < wires.length; output++) {
+      final targets = wires[output];
+      if (targets is! List) continue;
+      for (final target in targets) {
+        final destination = byId[target?.toString()];
+        if (destination == null) continue;
+        final link = FlowLink(
+          item.node['id'].toString(),
+          output,
+          target.toString(),
+        );
+        final path = _wirePath(
+          _outputWorld(item, output),
+          Offset(destination.rect.left, destination.rect.center.dy),
+        );
+        final isSelected = link == selectedLink;
+        canvas.drawPath(
+          path,
+          Paint()
+            ..color = isSelected ? RivlenColors.coral : const Color(0xFFB6AAA1)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = isSelected ? 3.2 : 2.2
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+    }
+  }
+
+  void _drawNode(Canvas canvas, _PlacedNode item) {
+    final node = item.node;
+    final rect = item.rect;
+    final type = node['type']?.toString() ?? '';
+    final color = nodeColor(type).color;
+    final selected = node['id']?.toString() == selectedNodeId;
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(13));
+    canvas.drawRRect(
+      rrect.shift(const Offset(0, 3)),
+      Paint()
+        ..color = const Color(0x192D1B16)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
+    );
+    canvas.drawRRect(rrect, Paint()..color = RivlenColors.surface);
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = selected ? RivlenColors.coral : const Color(0xFFE8E1DB)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = selected ? 1.7 : 0.9,
+    );
+    final iconRect = Rect.fromLTWH(rect.left + 11, rect.top + 16, 36, 36);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(iconRect, const Radius.circular(11)),
+      Paint()..color = color.withValues(alpha: 0.1),
+    );
+    _drawText(
+      canvas,
+      nodeColor(type).glyph,
+      Offset(iconRect.left, iconRect.top + 5),
+      color,
+      18,
+      fontWeight: FontWeight.w700,
+      width: iconRect.width,
+      align: TextAlign.center,
+    );
+    final title = nodeTitle(node);
+    final subtitle = nodeSubtitle(node);
+    _drawText(
+      canvas,
+      title,
+      Offset(rect.left + 57, rect.top + 14),
+      RivlenColors.ink,
+      13,
+      fontWeight: FontWeight.w600,
+      width: rect.width - 68,
+      maxLines: 1,
+    );
+    _drawText(
+      canvas,
+      subtitle,
+      Offset(rect.left + 57, rect.top + 36),
+      RivlenColors.muted,
+      10.5,
+      width: rect.width - 68,
+      maxLines: 1,
+    );
+    if (nodeHasInput(node)) {
+      _drawPort(canvas, Offset(rect.left, rect.center.dy), RivlenColors.wine);
+    }
+    final outputs = nodeOutputCount(node);
+    if (nodeHasOutput(node)) {
+      for (var index = 0; index < outputs; index++) {
+        final port = Offset(
+          rect.right,
+          rect.center.dy + _outputOffset(index, outputs),
+        );
+        _drawPort(
+          canvas,
+          port,
+          pendingSourceId == node['id'] && pendingOutputIndex == index
+              ? RivlenColors.coral
+              : RivlenColors.wine,
+        );
+      }
+    }
+  }
+
+  void _drawPort(Canvas canvas, Offset center, Color color) {
+    canvas.drawCircle(center, 7.5, Paint()..color = RivlenColors.surface);
+    canvas.drawCircle(
+      center,
+      5.2,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+    canvas.drawCircle(center, 1.8, Paint()..color = color);
+  }
+
+  void _drawText(
+    Canvas canvas,
+    String text,
+    Offset offset,
+    Color color,
+    double fontSize, {
+    required double width,
+    FontWeight fontWeight = FontWeight.w400,
+    TextAlign align = TextAlign.left,
+    int maxLines = 2,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          height: 1.1,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      maxLines: maxLines,
+      ellipsis: '…',
+      textAlign: align,
+    )..layout(maxWidth: width);
+    painter.paint(canvas, offset);
+  }
+
+  @override
+  bool shouldRepaint(covariant _FlowCanvasPainter oldDelegate) =>
+      oldDelegate.nodes != nodes ||
+      oldDelegate.scale != scale ||
+      oldDelegate.translation != translation ||
+      oldDelegate.selectedNodeId != selectedNodeId ||
+      oldDelegate.selectedLink != selectedLink ||
+      oldDelegate.pendingSourceId != pendingSourceId ||
+      oldDelegate.previewPoint != previewPoint;
+}
+
+class _EmptyCanvasHint extends StatelessWidget {
+  const _EmptyCanvasHint();
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: Column(
+      children: [
+        Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            color: RivlenColors.surface,
+            borderRadius: BorderRadius.circular(19),
+          ),
+          child: const Icon(
+            Icons.add_rounded,
+            color: RivlenColors.wine,
+            size: 25,
+          ),
+        ),
+        const SizedBox(height: 13),
+        const Text(
+          '双击空白处添加节点',
+          style: TextStyle(
+            color: RivlenColors.ink,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          '也可以从底部菜单添加',
+          style: TextStyle(color: RivlenColors.muted, fontSize: 12),
+        ),
+      ],
+    ),
+  );
+}

@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+data/
+certs/
+*.json
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.tmp
+*.test
+*.out
+vendor/
+Dockerfile
+compose.yaml
+README.md

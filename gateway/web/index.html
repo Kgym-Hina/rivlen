@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rivlen Gateway</title>
+    <style>
+      :root { color-scheme: light; --paper:#f7f5f3; --surface:#fffefc; --ink:#282522; --muted:#89837d; --line:#e8e3de; --wine:#8b2549; --coral:#ea725f; }
+      * { box-sizing:border-box; }
+      body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+      main { width:min(100% - 32px, 480px); margin:10vh auto 48px; }
+      header { display:flex; align-items:center; gap:12px; margin-bottom:42px; }
+      .mark { width:40px; height:40px; border-radius:15px; background:linear-gradient(145deg,var(--wine),var(--coral)); position:relative; }
+      .mark:before,.mark:after { content:""; position:absolute; width:8px; height:8px; border:2px solid white; border-radius:50%; top:8px; left:9px; }
+      .mark:after { top:auto; left:auto; right:8px; bottom:8px; }
+      h1 { font-size:20px; line-height:1.1; margin:0; letter-spacing:-.4px; }
+      header span { display:block; margin-top:4px; color:var(--muted); font-size:10px; letter-spacing:1px; }
+      section { background:var(--surface); border:1px solid var(--line); border-radius:22px; padding:24px; box-shadow:0 16px 50px #2825220a; }
+      h2 { font-size:22px; margin:0 0 6px; letter-spacing:-.5px; }
+      p { margin:0 0 20px; color:var(--muted); font-size:13px; }
+      label { display:block; font-size:13px; font-weight:600; margin:0 0 8px; }
+      input { width:100%; border:1px solid var(--line); border-radius:14px; background:white; color:var(--ink); font:inherit; padding:14px 15px; outline:none; }
+      input:focus { border-color:var(--wine); box-shadow:0 0 0 3px #8b25491a; }
+      button,.download { display:flex; align-items:center; justify-content:center; width:100%; min-height:50px; margin-top:12px; border:0; border-radius:15px; background:var(--wine); color:white; font:inherit; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer; }
+      button:disabled { opacity:.6; cursor:wait; }
+      .result { display:none; margin-top:24px; padding-top:22px; border-top:1px solid var(--line); text-align:center; }
+      .result img { display:block; width:min(100%,280px); margin:0 auto 12px; border-radius:12px; background:white; }
+      .expires { color:var(--muted); font-size:12px; margin:0; }
+      .download { background:#f2eeea; color:var(--ink); }
+      .error { display:none; color:#a72f35; font-size:13px; margin:12px 0 0; }
+      @media (max-width:480px) { main { margin-top:32px; } section { padding:20px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header><div class="mark" aria-hidden="true"></div><div><h1>Rivlen</h1><span>GATEWAY</span></div></header>
+      <section>
+        <h2>配对设备</h2>
+        <p>输入网关配对密码，生成一次性配对文件。</p>
+        <form id="form">
+          <label for="password">配对密码</label>
+          <input id="password" type="password" minlength="12" autocomplete="off" required>
+          <button id="submit" type="submit">生成配对二维码</button>
+          <div class="error" id="error" role="alert"></div>
+        </form>
+        <div class="result" id="result">
+          <img id="qr" alt="配对文件二维码">
+          <p class="expires" id="expires"></p>
+          <a class="download" id="download">下载配对文件</a>
+        </div>
+      </section>
+    </main>
+    <script>
+      const form = document.querySelector('#form');
+      const submit = document.querySelector('#submit');
+      const error = document.querySelector('#error');
+      const result = document.querySelector('#result');
+      const password = document.querySelector('#password');
+      const basePath = window.location.pathname.replace(/\/?$/, '/');
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        submit.disabled = true;
+        error.style.display = 'none';
+        result.style.display = 'none';
+        try {
+          const response = await fetch(`${basePath}api/v1/pairing-files`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: password.value })
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.error || '无法生成配对文件');
+          document.querySelector('#qr').src = payload.qrCodeDataUrl;
+          document.querySelector('#expires').textContent = `有效期至 ${new Date(payload.pairingFile.expiresAt).toLocaleString()}`;
+          const file = new Blob([JSON.stringify(payload.pairingFile, null, 2)], { type: 'application/json' });
+          const link = document.querySelector('#download');
+          link.href = URL.createObjectURL(file);
+          link.download = 'rivlen-pairing.json';
+          result.style.display = 'block';
+          password.value = '';
+        } catch (e) {
+          error.textContent = e.message;
+          error.style.display = 'block';
+        } finally {
+          submit.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
