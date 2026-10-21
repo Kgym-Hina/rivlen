@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/flow_bundle.dart';
+import '../models/home_assistant_catalog.dart';
 import '../models/node_red_connection.dart';
 
 class NodeRedApi {
@@ -188,6 +189,110 @@ class NodeRedApi {
       }
     }
     return getFlows(connection);
+  }
+
+  /// Loads the dynamic Home Assistant data that Node-RED already has access
+  /// to. The gateway only exposes the read-only metadata endpoints used here;
+  /// the Home Assistant token therefore stays inside Node-RED.
+  Future<HomeAssistantCatalog> getHomeAssistantCatalog(
+    NodeRedConnection connection, {
+    required Map<String, String> servers,
+  }) async {
+    if (servers.isEmpty) return const HomeAssistantCatalog();
+    final results = await Future.wait(
+      servers.entries.map((entry) async {
+        final serverId = entry.key.trim();
+        if (serverId.isEmpty) return const HomeAssistantCatalog();
+        try {
+          final resourceNames = const [
+            'entities',
+            'services',
+            'areas',
+            'devices',
+            'floors',
+            'labels',
+          ];
+          final resourceValues = await Future.wait(
+            resourceNames.map(
+              (resource) => _getNodeRedJson(
+                connection,
+                'homeassistant/$resource/${Uri.encodeComponent(serverId)}',
+              ).catchError((_) => null),
+            ),
+          );
+          return homeAssistantCatalogFromResponses(
+            entitiesPayload: resourceValues[0],
+            servicesPayload: resourceValues[1],
+            areasPayload: resourceValues[2],
+            devicesPayload: resourceValues[3],
+            floorsPayload: resourceValues[4],
+            labelsPayload: resourceValues[5],
+            serverId: serverId,
+            serverName: entry.value,
+          );
+        } catch (_) {
+          return const HomeAssistantCatalog();
+        }
+      }),
+    );
+    var catalog = const HomeAssistantCatalog();
+    for (final result in results) {
+      catalog = catalog.merge(result);
+    }
+    return catalog;
+  }
+
+  /// Returns the installed palette types so the mobile picker can expose HA
+  /// nodes that are not part of Rivlen's built-in catalog.
+  Future<List<Map<String, String>>> getInstalledNodeTypes(
+    NodeRedConnection connection,
+  ) async {
+    try {
+      final response = await _client
+          .get(_uri(connection, 'nodes'), headers: await _headers(connection))
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode != 200) return const [];
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List) return const [];
+      final result = <Map<String, String>>[];
+      for (final item in decoded) {
+        if (item is! Map || item['types'] is! List) continue;
+        final module = item['module']?.toString().trim() ?? '';
+        final packageName = item['name']?.toString().trim() ?? '';
+        for (final rawType in item['types'] as List) {
+          final type = rawType.toString().trim();
+          if (type.isEmpty) continue;
+          result.add({'type': type, 'module': module, 'package': packageName});
+        }
+      }
+      return result;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<dynamic> _getNodeRedJson(
+    NodeRedConnection connection,
+    String endpoint,
+  ) async {
+    final headers = await _headers(connection);
+    var response = await _client
+        .get(_uri(connection, endpoint), headers: headers)
+        .timeout(const Duration(seconds: 20));
+    if (response.statusCode == 401 &&
+        connection.authMode == NodeRedAuthMode.credentials) {
+      _tokens.remove(connection.id);
+      response = await _client
+          .get(_uri(connection, endpoint), headers: await _headers(connection))
+          .timeout(const Duration(seconds: 20));
+    }
+    if (response.statusCode != 200) {
+      throw NodeRedApiException(
+        '读取 Home Assistant 数据失败（HTTP ${response.statusCode}）。',
+        statusCode: response.statusCode,
+      );
+    }
+    return jsonDecode(response.body);
   }
 
   /// Reads the form labels that Node-RED's own editor uses for the node

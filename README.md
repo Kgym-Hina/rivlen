@@ -31,6 +31,10 @@ proxy path, for example `https://automation.example.com/nodered`.
 - Node attributes and unknown fields are preserved. The palette includes common
   built-in nodes; unsupported node editors can still be adjusted through the
   full node JSON editor.
+- Home Assistant nodes have a native editor. It loads the Home Assistant
+  server's entity and service catalogs from Node-RED, then exposes actions,
+  servers, entities, targets, comparisons, durations, and queue options with
+  mobile pickers while preserving fields added by newer node versions.
 
 Connection profiles are saved in the app's local preferences; passwords and
 gateway tokens are stored in the platform secure storage. The connection screen
@@ -45,6 +49,7 @@ is not included in pairing QR codes or files.
 ## Gateway
 
 The Go gateway and its deployment instructions are in [`gateway/`](gateway/).
-Node-RED remains private; only the `GET /flows` and `POST /flows` Admin API
-operations are proxied to authorized Rivlen devices. See the gateway guide for
-password, TLS, reverse-proxy, and Docker configuration.
+Node-RED remains private; only the Flow Admin API and the allowlisted,
+read-only Home Assistant metadata routes are proxied to authorized Rivlen
+devices. See the gateway guide for password, TLS, reverse-proxy, and Docker
+configuration.

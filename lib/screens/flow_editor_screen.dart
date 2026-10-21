@@ -5,10 +5,31 @@ import 'package:flutter/services.dart';
 
 import '../data/node_catalog.dart';
 import '../models/flow_bundle.dart';
+import '../models/home_assistant_catalog.dart';
 import '../models/node_red_connection.dart';
 import '../services/node_red_api.dart';
 import '../theme.dart';
 import '../widgets/flow_canvas.dart';
+import '../widgets/home_assistant_node_editor.dart';
+
+bool isHomeAssistantNodeType(String type) {
+  const exact = {
+    'api-call-service',
+    'api-current-state',
+    'api-get-history',
+    'api-render-template',
+    'ha-api',
+    'ha-device',
+    'ha-get-entities',
+    'poll-state',
+    'server-events',
+    'server-state-changed',
+    'trigger-state',
+  };
+  return exact.contains(type) ||
+      type.startsWith('ha-') ||
+      type.startsWith('api-');
+}
 
 class FlowEditorScreen extends StatefulWidget {
   const FlowEditorScreen({
@@ -41,7 +62,11 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
   List<List<FlowNode>> _undoStack = [];
   List<List<FlowNode>> _redoStack = [];
   List<String> _recentTypes = [];
+  List<NodeKind> _installedNodeKinds = const [];
   Map<String, Map<String, String>> _nodeFieldLabels = {};
+  HomeAssistantCatalog _haCatalog = const HomeAssistantCatalog();
+  Future<void>? _haCatalogRequest;
+  bool _haCatalogLoaded = false;
 
   bool get _isDemo => widget.connection.id == 'demo';
   bool get _isDirty => _canonical(_nodes) != _canonical(_deployedNodes);
@@ -71,6 +96,8 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
     _activeTabId = tabs.first['id'].toString();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadNodeFieldLabels();
+      _loadInstalledNodeKinds();
+      _loadHomeAssistantCatalog();
     });
   }
 
@@ -124,6 +151,68 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       // Form metadata is an enhancement. The normal editor remains usable
       // when an older Node-RED instance does not expose the editor endpoint.
     }
+  }
+
+  Future<void> _loadHomeAssistantCatalog() {
+    if (_isDemo) return Future<void>.value();
+    if (_haCatalogLoaded) return Future<void>.value();
+    final existing = _haCatalogRequest;
+    if (existing != null) return existing;
+    final servers = <String, String>{};
+    for (final node in _nodes) {
+      if (node['type']?.toString() != 'server') continue;
+      final id = node['id']?.toString().trim() ?? '';
+      if (id.isEmpty) continue;
+      final name = node['name']?.toString().trim();
+      servers[id] = name == null || name.isEmpty ? id : name;
+    }
+    if (servers.isEmpty) {
+      for (final node in _nodes) {
+        if (!isHomeAssistantNodeType(node['type']?.toString() ?? '')) continue;
+        final id = node['server']?.toString().trim() ?? '';
+        if (id.isNotEmpty) servers.putIfAbsent(id, () => id);
+      }
+    }
+    if (servers.isEmpty) return Future<void>.value();
+    final request = _api
+        .getHomeAssistantCatalog(widget.connection, servers: servers)
+        .then<void>((catalog) {
+          _haCatalogLoaded = true;
+          if (mounted) setState(() => _haCatalog = catalog);
+        })
+        .catchError((_) {});
+    _haCatalogRequest = request;
+    request.whenComplete(() => _haCatalogRequest = null);
+    return request;
+  }
+
+  Future<void> _loadInstalledNodeKinds() async {
+    if (_isDemo) return;
+    final installed = await _api.getInstalledNodeTypes(widget.connection);
+    if (!mounted || installed.isEmpty) return;
+    final seen = <String>{};
+    final kinds = <NodeKind>[];
+    for (final item in installed) {
+      final type = item['type']?.trim() ?? '';
+      if (type.isEmpty ||
+          !seen.add(type) ||
+          nodeKinds.any((kind) => kind.type == type)) {
+        continue;
+      }
+      final module = item['module']?.trim() ?? '';
+      final isHa =
+          module.contains('home-assistant') || isHomeAssistantNodeType(type);
+      kinds.add(
+        NodeKind(
+          type,
+          nodeTypeLabel(type),
+          isHa ? 'Home Assistant' : '已安装节点',
+          module.isEmpty ? type : module,
+        ),
+      );
+    }
+    kinds.sort((a, b) => a.title.compareTo(b.title));
+    setState(() => _installedNodeKinds = kinds);
   }
 
   void _recordSnapshot() {
@@ -297,6 +386,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       ),
       builder: (_) => _NodePickerSheet(
         recentTypes: _recentTypes,
+        additionalNodeKinds: _installedNodeKinds,
         acceptsInput: sourceId != null || insertLink != null,
         acceptsOutput: insertLink != null,
       ),
@@ -395,6 +485,12 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       await _loadNodeFieldLabels([type])
           .timeout(const Duration(seconds: 3), onTimeout: () {});
     }
+    if (isHomeAssistantNodeType(type)) {
+      await _loadHomeAssistantCatalog().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {},
+      );
+    }
     if (!mounted) return;
     final result = await showModalBottomSheet<FlowNode>(
       context: context,
@@ -403,10 +499,16 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => _NodeEditorSheet(
-        initial: original,
-        fieldLabels: _nodeFieldLabels[type] ?? const {},
-      ),
+      builder: (_) => isHomeAssistantNodeType(type)
+          ? HomeAssistantNodeEditor(
+              initial: original,
+              catalog: _haCatalog,
+              fieldLabels: _nodeFieldLabels[type] ?? const {},
+            )
+          : _NodeEditorSheet(
+              initial: original,
+              fieldLabels: _nodeFieldLabels[type] ?? const {},
+            ),
     );
     if (result != null) {
       if (result['__delete'] == true) {
@@ -787,6 +889,9 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
     try {
       final latest = await _api.getFlows(widget.connection);
       _installRemote(latest);
+      _haCatalogLoaded = false;
+      _haCatalog = const HomeAssistantCatalog();
+      await _loadHomeAssistantCatalog();
       _showMessage('已从实例载入最新 Flow');
     } catch (error) {
       _showMessage(error.toString());
@@ -1313,10 +1418,12 @@ class _NodeGlyph extends StatelessWidget {
 class _NodePickerSheet extends StatefulWidget {
   const _NodePickerSheet({
     required this.recentTypes,
+    required this.additionalNodeKinds,
     required this.acceptsInput,
     required this.acceptsOutput,
   });
   final List<String> recentTypes;
+  final List<NodeKind> additionalNodeKinds;
   final bool acceptsInput;
   final bool acceptsOutput;
 
@@ -1344,8 +1451,11 @@ class _NodePickerSheetState extends State<_NodePickerSheet> {
       'Network',
       'Output',
       'Other',
+      'Home Assistant',
+      '已安装节点',
     ];
-    final available = nodeKinds.where((kind) {
+    final allKinds = <NodeKind>[...nodeKinds, ...widget.additionalNodeKinds];
+    final available = allKinds.where((kind) {
       if (widget.acceptsInput && !nodeHasInput({'type': kind.type})) {
         return false;
       }

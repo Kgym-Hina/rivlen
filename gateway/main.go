@@ -230,6 +230,7 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/node-red/nodes/", s.handleNodeRedMetadata)
 	mux.HandleFunc("/api/node-red/locales/nodes", s.handleNodeRedMetadata)
 	mux.HandleFunc("/api/node-red/locales/", s.handleNodeRedMetadata)
+	mux.HandleFunc("/api/node-red/homeassistant/", s.handleNodeRedMetadata)
 	return securityHeaders(mux)
 }
 
@@ -570,6 +571,18 @@ func allowedNodeRedMetadataPath(path string) bool {
 	if strings.HasPrefix(path, "/locales/") {
 		parts := strings.Split(strings.TrimPrefix(path, "/locales/"), "/")
 		return validMetadataPathParts(parts, 1, 2)
+	}
+	if strings.HasPrefix(path, "/homeassistant/") {
+		parts := strings.Split(strings.TrimPrefix(path, "/homeassistant/"), "/")
+		if !validMetadataPathParts(parts, 2, 2) {
+			return false
+		}
+		switch parts[0] {
+		case "entities", "services", "areas", "devices", "floors", "labels", "entityRegistry", "integration":
+			return true
+		default:
+			return false
+		}
 	}
 	return false
 }
