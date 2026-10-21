@@ -177,8 +177,16 @@ bool nodeHasOutput(FlowNode node) => !const {
 }.contains(node['type']);
 
 RivlenNodeColor nodeColor(String type) {
+  if (type.startsWith('api-') ||
+      type.startsWith('ha-') ||
+      type.startsWith('server-') ||
+      type == 'poll-state' ||
+      type == 'trigger-state' ||
+      type == 'events-state') {
+    return RivlenNodeColor(const Color(0xFF42B7E8), 'H');
+  }
   if (const {'inject', 'catch', 'complete', 'link in'}.contains(type)) {
-    return const RivlenNodeColor(RivlenColors.amber, 'I');
+    return RivlenNodeColor(RivlenColors.amber, 'I');
   }
   if (const {
     'function',
@@ -187,20 +195,20 @@ RivlenNodeColor nodeColor(String type) {
     'delay',
     'template',
   }.contains(type)) {
-    return const RivlenNodeColor(RivlenColors.blue, 'ƒ');
+    return RivlenNodeColor(RivlenColors.blue, 'ƒ');
   }
   if (const {'debug', 'http response', 'link out'}.contains(type)) {
-    return const RivlenNodeColor(RivlenColors.green, '↗');
+    return RivlenNodeColor(RivlenColors.green, '↗');
   }
   if (const {'http request', 'mqtt in', 'mqtt out', 'http in'}.contains(type)) {
-    return const RivlenNodeColor(RivlenColors.purple, '↔');
+    return RivlenNodeColor(RivlenColors.purple, '↔');
   }
-  if (type == 'comment') return const RivlenNodeColor(RivlenColors.muted, '·');
-  return const RivlenNodeColor(RivlenColors.wine, 'N');
+  if (type == 'comment') return RivlenNodeColor(RivlenColors.muted, '·');
+  return RivlenNodeColor(RivlenColors.wine, 'N');
 }
 
 class RivlenNodeColor {
-  const RivlenNodeColor(this.color, this.glyph);
+  RivlenNodeColor(this.color, this.glyph);
   final Color color;
   final String glyph;
 }

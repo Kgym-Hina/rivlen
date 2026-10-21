@@ -7,6 +7,7 @@ import '../data/node_catalog.dart';
 import '../models/flow_bundle.dart';
 import '../models/home_assistant_catalog.dart';
 import '../models/node_red_connection.dart';
+import '../models/node_editor_schema.dart';
 import '../services/node_red_api.dart';
 import '../theme.dart';
 import '../widgets/flow_canvas.dart';
@@ -63,7 +64,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
   List<List<FlowNode>> _redoStack = [];
   List<String> _recentTypes = [];
   List<NodeKind> _installedNodeKinds = const [];
-  Map<String, Map<String, String>> _nodeFieldLabels = {};
+  Map<String, NodeEditorSchema> _nodeEditorSchemas = {};
   HomeAssistantCatalog _haCatalog = const HomeAssistantCatalog();
   Future<void>? _haCatalogRequest;
   bool _haCatalogLoaded = false;
@@ -139,13 +140,13 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
     final requested =
         types ?? _nodes.map((node) => node['type']?.toString() ?? '');
     try {
-      final labels = await _api.getNodeFieldLabels(
+      final schemas = await _api.getNodeEditorSchemas(
         widget.connection,
         requested,
       );
-      if (!mounted || labels.isEmpty) return;
+      if (!mounted || schemas.isEmpty) return;
       setState(() {
-        _nodeFieldLabels = {..._nodeFieldLabels, ...labels};
+        _nodeEditorSchemas = {..._nodeEditorSchemas, ...schemas};
       });
     } catch (_) {
       // Form metadata is an enhancement. The normal editor remains usable
@@ -484,7 +485,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
     final original = _nodes.firstWhere((node) => node['id'].toString() == id);
     if (isJunctionNode(original)) return;
     final type = original['type']?.toString() ?? '';
-    if (!_isDemo && !_nodeFieldLabels.containsKey(type)) {
+    if (!_isDemo && !_nodeEditorSchemas.containsKey(type)) {
       await _loadNodeFieldLabels([type])
           .timeout(const Duration(seconds: 3), onTimeout: () {});
     }
@@ -506,11 +507,11 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
           ? HomeAssistantNodeEditor(
               initial: original,
               catalog: _haCatalog,
-              fieldLabels: _nodeFieldLabels[type] ?? const {},
+              schema: _nodeEditorSchemas[type] ?? const NodeEditorSchema(),
             )
           : _NodeEditorSheet(
               initial: original,
-              fieldLabels: _nodeFieldLabels[type] ?? const {},
+              schema: _nodeEditorSchemas[type] ?? const NodeEditorSchema(),
             ),
     );
     if (result != null) {
@@ -554,12 +555,12 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
               ),
               const SizedBox(height: 10),
               ListTile(
-                leading: const Icon(Icons.add_circle_outline_rounded),
+                leading: Icon(Icons.add_circle_outline_rounded),
                 title: const Text('在线上插入节点'),
                 onTap: () => Navigator.pop(context, 'insert'),
               ),
               ListTile(
-                leading: const Icon(Icons.link_off_rounded),
+                leading: Icon(Icons.link_off_rounded),
                 title: const Text('删除连线'),
                 onTap: () => Navigator.pop(context, 'delete'),
               ),
@@ -635,7 +636,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                   subtitle: Text('$count 个节点'),
                   trailing: IconButton(
                     tooltip: '重命名 Flow',
-                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    icon: Icon(Icons.edit_outlined, size: 18),
                     onPressed: () async {
                       Navigator.pop(context, 'rename:$id');
                     },
@@ -675,7 +676,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(labelText: '名称'),
+          decoration: InputDecoration(labelText: '名称'),
         ),
         actions: [
           TextButton(
@@ -741,7 +742,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                       controller: controller,
                       autofocus: true,
                       onChanged: (_) => setSheetState(() {}),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: '搜索节点',
                         prefixIcon: Icon(Icons.search_rounded),
                       ),
@@ -749,7 +750,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                     const SizedBox(height: 8),
                     Expanded(
                       child: results.isEmpty
-                          ? const Center(
+                          ? Center(
                               child: Text(
                                 '没有匹配的节点',
                                 style: TextStyle(color: RivlenColors.muted),
@@ -758,7 +759,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                           : ListView.separated(
                               itemCount: results.length,
                               separatorBuilder: (_, _) =>
-                                  const Divider(height: 1, indent: 54),
+                                  Divider(height: 1, indent: 54),
                               itemBuilder: (context, index) {
                                 final node = results[index];
                                 return ListTile(
@@ -820,28 +821,28 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
               ),
               const SizedBox(height: 9),
               ListTile(
-                leading: const Icon(Icons.add_circle_outline_rounded),
+                leading: Icon(Icons.add_circle_outline_rounded),
                 title: const Text('添加节点'),
                 onTap: () => Navigator.pop(context, 'add'),
               ),
               ListTile(
-                leading: const Icon(Icons.center_focus_strong_rounded),
+                leading: Icon(Icons.center_focus_strong_rounded),
                 title: const Text('适应画布'),
                 onTap: () => Navigator.pop(context, 'fit'),
               ),
               ListTile(
-                leading: const Icon(Icons.content_copy_rounded),
+                leading: Icon(Icons.content_copy_rounded),
                 title: const Text('复制 Flow JSON'),
                 onTap: () => Navigator.pop(context, 'copy'),
               ),
               if (!_isDemo)
                 ListTile(
-                  leading: const Icon(Icons.refresh_rounded),
+                  leading: Icon(Icons.refresh_rounded),
                   title: const Text('从实例重新载入'),
                   onTap: () => Navigator.pop(context, 'reload'),
                 ),
               ListTile(
-                leading: const Icon(Icons.hub_outlined),
+                leading: Icon(Icons.hub_outlined),
                 title: Text(_isDemo ? '示例画布' : widget.connection.name),
                 subtitle: Text(_isDemo ? '未连接实例' : widget.connection.baseUrl),
               ),
@@ -982,7 +983,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        icon: const Icon(Icons.sync_problem_rounded, color: RivlenColors.amber),
+        icon: Icon(Icons.sync_problem_rounded, color: RivlenColors.amber),
         title: const Text('实例中的 Flow 已更新'),
         content: Text(
           remote == null
@@ -1063,7 +1064,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
           leadingWidth: 48,
           leading: IconButton(
             onPressed: _deploying ? null : _leaveEditor,
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
+            icon: Icon(Icons.arrow_back_ios_new_rounded, size: 19),
             tooltip: '返回实例',
           ),
           titleSpacing: 4,
@@ -1084,7 +1085,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                           tabLabel,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w600,
                             letterSpacing: -0.4,
@@ -1092,7 +1093,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.expand_more_rounded, size: 19),
+                      Icon(Icons.expand_more_rounded, size: 19),
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -1121,7 +1122,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                             : widget.connection.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
                           color: RivlenColors.muted,
                           fontWeight: FontWeight.w500,
@@ -1134,15 +1135,16 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
             ),
           ),
           actions: [
+            const RivlenThemeButton(),
             IconButton(
               tooltip: '撤销',
               onPressed: _canUndo ? _undo : null,
-              icon: const Icon(Icons.undo_rounded, size: 21),
+              icon: Icon(Icons.undo_rounded, size: 21),
             ),
             IconButton(
               tooltip: '重做',
               onPressed: _canRedo ? _redo : null,
-              icon: const Icon(Icons.redo_rounded, size: 21),
+              icon: Icon(Icons.redo_rounded, size: 21),
             ),
             Padding(
               padding: const EdgeInsets.only(right: 13, left: 1),
@@ -1252,7 +1254,7 @@ class _SelectedNodeBar extends StatelessWidget {
         bottom: false,
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(top: BorderSide(color: RivlenColors.line)),
           ),
           child: Row(
@@ -1268,7 +1270,7 @@ class _SelectedNodeBar extends StatelessWidget {
                       nodeTitle(node),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1278,17 +1280,14 @@ class _SelectedNodeBar extends StatelessWidget {
                       '类型 · $type',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: RivlenColors.muted,
-                      ),
+                      style: TextStyle(fontSize: 11, color: RivlenColors.muted),
                     ),
                   ],
                 ),
               ),
               TextButton.icon(
                 onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined, size: 17),
+                icon: Icon(Icons.edit_outlined, size: 17),
                 label: const Text('编辑'),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1297,7 +1296,7 @@ class _SelectedNodeBar extends StatelessWidget {
               ),
               TextButton.icon(
                 onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded, size: 17),
+                icon: Icon(Icons.delete_outline_rounded, size: 17),
                 label: const Text('删除'),
                 style: TextButton.styleFrom(
                   foregroundColor: RivlenColors.wine,
@@ -1327,7 +1326,7 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       color: RivlenColors.surface,
       border: Border(top: BorderSide(color: RivlenColors.line)),
     ),
@@ -1387,7 +1386,7 @@ class _BottomAction extends StatelessWidget {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 10, color: RivlenColors.muted),
+          style: TextStyle(fontSize: 10, color: RivlenColors.muted),
         ),
       ],
     ),
@@ -1527,10 +1526,7 @@ class _NodePickerSheetState extends State<_NodePickerSheet> {
                   ),
                   Text(
                     '${nodes.length}',
-                    style: const TextStyle(
-                      color: RivlenColors.muted,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: RivlenColors.muted, fontSize: 12),
                   ),
                 ],
               ),
@@ -1538,7 +1534,7 @@ class _NodePickerSheetState extends State<_NodePickerSheet> {
               TextField(
                 controller: _search,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: '搜索节点类型',
                   prefixIcon: Icon(Icons.search_rounded),
                 ),
@@ -1582,7 +1578,7 @@ class _NodePickerSheetState extends State<_NodePickerSheet> {
               const SizedBox(height: 6),
               Expanded(
                 child: nodes.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           '没有匹配的节点',
                           style: TextStyle(color: RivlenColors.muted),
@@ -1591,7 +1587,7 @@ class _NodePickerSheetState extends State<_NodePickerSheet> {
                     : ListView.separated(
                         itemCount: nodes.length,
                         separatorBuilder: (_, _) =>
-                            const Divider(height: 1, indent: 51),
+                            Divider(height: 1, indent: 51),
                         itemBuilder: (context, index) {
                           final kind = nodes[index];
                           return ListTile(
@@ -1601,12 +1597,10 @@ class _NodePickerSheetState extends State<_NodePickerSheet> {
                             leading: _NodeGlyph(type: kind.type),
                             title: Text(
                               kind.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                             subtitle: Text(kind.description, maxLines: 1),
-                            trailing: const Icon(
+                            trailing: Icon(
                               Icons.add_rounded,
                               color: RivlenColors.muted,
                             ),
@@ -1624,9 +1618,12 @@ class _NodePickerSheetState extends State<_NodePickerSheet> {
 }
 
 class _NodeEditorSheet extends StatefulWidget {
-  const _NodeEditorSheet({required this.initial, this.fieldLabels = const {}});
+  const _NodeEditorSheet({
+    required this.initial,
+    this.schema = const NodeEditorSchema(),
+  });
   final FlowNode initial;
-  final Map<String, String> fieldLabels;
+  final NodeEditorSchema schema;
 
   @override
   State<_NodeEditorSheet> createState() => _NodeEditorSheetState();
@@ -1650,7 +1647,7 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
       controller.dispose();
     }
     _fields.clear();
-    for (final field in nodeEditorFields(_draft)) {
+    for (final field in _orderedFields(nodeEditorFields(_draft))) {
       _fields[field] = TextEditingController(
         text: _draft[field]?.toString() ?? '',
       );
@@ -1672,6 +1669,18 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
           .map((kind) => kind.title)
           .firstOrNull ??
       nodeTypeLabel(_draft['type']?.toString() ?? 'Node');
+
+  List<String> _orderedFields(Iterable<String> fields) {
+    final available = fields.toSet();
+    final ordered = <String>[];
+    for (final field in widget.schema.fieldOrder) {
+      if (available.remove(field)) ordered.add(field);
+    }
+    for (final field in fields) {
+      if (available.remove(field)) ordered.add(field);
+    }
+    return ordered;
+  }
 
   Future<void> _editComplexField(String field) async {
     _applyControllers();
@@ -1787,7 +1796,7 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
                         ),
                         Text(
                           _typeLabel,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             color: RivlenColors.muted,
                           ),
@@ -1800,7 +1809,7 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
                     onPressed: () => Navigator.pop(context, <String, dynamic>{
                       '__delete': true,
                     }),
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.delete_outline_rounded,
                       color: RivlenColors.muted,
                     ),
@@ -1813,23 +1822,22 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
                   children: [
                     TextField(
                       controller: _name,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: '名称',
                         prefixIcon: Icon(Icons.label_outline_rounded),
                       ),
                     ),
                     const SizedBox(height: 12),
-                    ...nodeEditorFields(_draft).map((field) {
+                    ..._orderedFields(nodeEditorFields(_draft)).map((field) {
                       final value = _draft[field];
                       if (value is bool) {
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: SwitchListTile.adaptive(
-                            contentPadding: EdgeInsets.zero,
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _GenericFormSwitchField(
+                            title: _humanize(field),
                             value: value,
                             onChanged: (next) =>
                                 setState(() => _draft[field] = next),
-                            title: Text(_humanize(field)),
                           ),
                         );
                       }
@@ -1909,7 +1917,7 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
   }
 
   String _humanize(String value) {
-    final provided = widget.fieldLabels[value]?.trim();
+    final provided = widget.schema.labelFor(value);
     if (provided != null && provided.isNotEmpty) return provided;
     return switch (value) {
       'name' => '名称',
@@ -2012,11 +2020,11 @@ class _NodeValueEditorState extends State<_NodeValueEditor> {
     appBar: AppBar(
       leading: IconButton(
         onPressed: () => Navigator.pop(context),
-        icon: const Icon(Icons.close_rounded),
+        icon: Icon(Icons.close_rounded),
       ),
       title: Text(widget.title),
       actions: [TextButton(onPressed: _save, child: const Text('保存'))],
-      bottom: const PreferredSize(
+      bottom: PreferredSize(
         preferredSize: Size.fromHeight(32),
         child: Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
@@ -2042,7 +2050,7 @@ class _NodeValueEditorState extends State<_NodeValueEditor> {
           autocorrect: false,
           enableSuggestions: false,
           keyboardType: TextInputType.multiline,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 13,
             height: 1.5,
@@ -2054,11 +2062,11 @@ class _NodeValueEditorState extends State<_NodeValueEditor> {
             contentPadding: const EdgeInsets.all(16),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: RivlenColors.line),
+              borderSide: BorderSide(color: RivlenColors.line),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: RivlenColors.line),
+              borderSide: BorderSide(color: RivlenColors.line),
             ),
           ),
         ),
@@ -2080,50 +2088,80 @@ class _EditorActionTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: RivlenColors.canvas,
-    borderRadius: BorderRadius.circular(15),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Padding(
-        padding: const EdgeInsets.all(13),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: RivlenColors.wine),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+  Widget build(BuildContext context) {
+    return Material(
+      color: RivlenColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Theme.of(context).dividerColor),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: RivlenColors.wine),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: RivlenColors.ink,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: RivlenColors.muted,
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, color: RivlenColors.muted),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: RivlenColors.muted,
-              size: 19,
-            ),
-          ],
+              Icon(
+                Icons.chevron_right_rounded,
+                color: RivlenColors.muted,
+                size: 19,
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _GenericFormSwitchField extends StatelessWidget {
+  const _GenericFormSwitchField({
+    required this.title,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String title;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: RivlenColors.surface,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Theme.of(context).dividerColor),
+    ),
+    child: SwitchListTile.adaptive(
+      value: value,
+      title: Text(title),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 15),
+      onChanged: onChanged,
     ),
   );
 }
@@ -2158,7 +2196,7 @@ class _TextDocumentEditorState extends State<_TextDocumentEditor> {
     appBar: AppBar(
       leading: IconButton(
         onPressed: () => Navigator.pop(context),
-        icon: const Icon(Icons.close_rounded),
+        icon: Icon(Icons.close_rounded),
       ),
       title: Text(widget.title),
       actions: [
@@ -2173,15 +2211,11 @@ class _TextDocumentEditorState extends State<_TextDocumentEditor> {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
           child: Row(
             children: [
-              const Icon(
-                Icons.code_rounded,
-                size: 14,
-                color: RivlenColors.muted,
-              ),
+              Icon(Icons.code_rounded, size: 14, color: RivlenColors.muted),
               const SizedBox(width: 6),
               Text(
                 widget.language,
-                style: const TextStyle(color: RivlenColors.muted, fontSize: 11),
+                style: TextStyle(color: RivlenColors.muted, fontSize: 11),
               ),
             ],
           ),
@@ -2200,7 +2234,7 @@ class _TextDocumentEditorState extends State<_TextDocumentEditor> {
           autocorrect: false,
           enableSuggestions: false,
           keyboardType: TextInputType.multiline,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 13,
             height: 1.5,
@@ -2212,11 +2246,11 @@ class _TextDocumentEditorState extends State<_TextDocumentEditor> {
             contentPadding: const EdgeInsets.all(16),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: RivlenColors.line),
+              borderSide: BorderSide(color: RivlenColors.line),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: RivlenColors.line),
+              borderSide: BorderSide(color: RivlenColors.line),
             ),
           ),
         ),
@@ -2266,11 +2300,11 @@ class _RawNodeEditorState extends State<_RawNodeEditor> {
     appBar: AppBar(
       leading: IconButton(
         onPressed: () => Navigator.pop(context),
-        icon: const Icon(Icons.close_rounded),
+        icon: Icon(Icons.close_rounded),
       ),
       title: const Text('节点 JSON'),
       actions: [TextButton(onPressed: _save, child: const Text('保存'))],
-      bottom: const PreferredSize(
+      bottom: PreferredSize(
         preferredSize: Size.fromHeight(32),
         child: Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
@@ -2296,7 +2330,7 @@ class _RawNodeEditorState extends State<_RawNodeEditor> {
           autocorrect: false,
           enableSuggestions: false,
           keyboardType: TextInputType.multiline,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 12,
             height: 1.45,
@@ -2308,11 +2342,11 @@ class _RawNodeEditorState extends State<_RawNodeEditor> {
             contentPadding: const EdgeInsets.all(15),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: RivlenColors.line),
+              borderSide: BorderSide(color: RivlenColors.line),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: RivlenColors.line),
+              borderSide: BorderSide(color: RivlenColors.line),
             ),
           ),
         ),

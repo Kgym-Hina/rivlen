@@ -129,7 +129,7 @@ class _PairGatewayScreenState extends State<PairGatewayScreen> {
     appBar: AppBar(
       leading: IconButton(
         onPressed: _pairing ? null : () => Navigator.pop(context),
-        icon: const Icon(Icons.arrow_back_rounded),
+        icon: Icon(Icons.arrow_back_rounded),
       ),
       title: const Text('配对网关'),
     ),
@@ -143,7 +143,7 @@ class _PairGatewayScreenState extends State<PairGatewayScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           '扫描配对二维码',
           style: TextStyle(
             color: RivlenColors.ink,
@@ -189,12 +189,12 @@ class _PairGatewayScreenState extends State<PairGatewayScreen> {
         const SizedBox(height: 14),
         OutlinedButton.icon(
           onPressed: _reading ? null : _chooseFile,
-          icon: const Icon(Icons.file_open_outlined),
+          icon: Icon(Icons.file_open_outlined),
           label: const Text('导入配对文件'),
           style: OutlinedButton.styleFrom(
             foregroundColor: RivlenColors.wine,
             minimumSize: const Size.fromHeight(52),
-            side: const BorderSide(color: RivlenColors.line),
+            side: BorderSide(color: RivlenColors.line),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -210,7 +210,7 @@ class _PairGatewayScreenState extends State<PairGatewayScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(22, 12, 22, 28),
       children: [
-        const Text(
+        Text(
           '授权此设备',
           style: TextStyle(
             color: RivlenColors.ink,
@@ -229,7 +229,7 @@ class _PairGatewayScreenState extends State<PairGatewayScreen> {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              const Icon(Icons.hub_outlined, color: RivlenColors.wine),
+              Icon(Icons.hub_outlined, color: RivlenColors.wine),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -237,7 +237,7 @@ class _PairGatewayScreenState extends State<PairGatewayScreen> {
                   children: [
                     Text(
                       uri.host,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: RivlenColors.ink,
                         fontWeight: FontWeight.w600,
                       ),
@@ -245,10 +245,7 @@ class _PairGatewayScreenState extends State<PairGatewayScreen> {
                     const SizedBox(height: 3),
                     Text(
                       '配对文件有效至 ${_time(file.expiresAt)}',
-                      style: const TextStyle(
-                        color: RivlenColors.muted,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: RivlenColors.muted, fontSize: 12),
                     ),
                   ],
                 ),
@@ -260,7 +257,7 @@ class _PairGatewayScreenState extends State<PairGatewayScreen> {
         TextField(
           controller: _deviceName,
           textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: '设备名称',
             prefixIcon: Icon(Icons.devices_outlined),
           ),
@@ -273,7 +270,7 @@ class _PairGatewayScreenState extends State<PairGatewayScreen> {
           onSubmitted: (_) => _pair(),
           decoration: InputDecoration(
             labelText: '网关配对密码',
-            prefixIcon: const Icon(Icons.lock_outline_rounded),
+            prefixIcon: Icon(Icons.lock_outline_rounded),
             suffixIcon: IconButton(
               onPressed: () => setState(() => _showPassword = !_showPassword),
               icon: Icon(
@@ -320,7 +317,7 @@ class _PairGatewayScreenState extends State<PairGatewayScreen> {
                   _error = null;
                   _scanner.start();
                 }),
-          icon: const Icon(Icons.qr_code_scanner_rounded),
+          icon: Icon(Icons.qr_code_scanner_rounded),
           label: const Text('重新扫描或导入'),
           style: TextButton.styleFrom(foregroundColor: RivlenColors.muted),
         ),
@@ -349,7 +346,7 @@ class _ErrorMessage extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
     child: Text(
       message,
-      style: const TextStyle(color: Color(0xFF9F3136), fontSize: 13),
+      style: TextStyle(color: Color(0xFF9F3136), fontSize: 13),
     ),
   );
 }

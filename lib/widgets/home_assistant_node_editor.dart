@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../data/node_catalog.dart';
 import '../models/flow_bundle.dart';
 import '../models/home_assistant_catalog.dart';
+import '../models/node_editor_schema.dart';
 import '../theme.dart';
 
 /// A native editor for the Home Assistant Node-RED nodes.
@@ -18,12 +19,12 @@ class HomeAssistantNodeEditor extends StatefulWidget {
     super.key,
     required this.initial,
     required this.catalog,
-    this.fieldLabels = const {},
+    this.schema = const NodeEditorSchema(),
   });
 
   final FlowNode initial;
   final HomeAssistantCatalog catalog;
-  final Map<String, String> fieldLabels;
+  final NodeEditorSchema schema;
 
   @override
   State<HomeAssistantNodeEditor> createState() =>
@@ -147,7 +148,7 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
       controller.dispose();
     }
     _fields.clear();
-    for (final field in nodeEditorFields(_draft)) {
+    for (final field in _orderedFields(nodeEditorFields(_draft))) {
       if (_isPickerField(field) || _isHiddenByNativeField(field)) continue;
       _fields[field] = TextEditingController(
         text: _draft[field]?.toString() ?? '',
@@ -157,6 +158,10 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
 
   bool _isHiddenByNativeField(String field) {
     if (field == 'version') return true;
+    if (field == 'dataType' &&
+        (_type == 'api-call-service' || _type == 'ha-api')) {
+      return true;
+    }
     if (field == 'domain' || field == 'service') {
       return _type == 'api-call-service';
     }
@@ -193,6 +198,19 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
       field == 'entities' && _draft[field] is Map;
 
   String _label(String field) {
+    final schemaLabel = widget.schema.labelFor(field);
+    if (schemaLabel != null) return schemaLabel;
+    if (_type == 'api-call-service') {
+      final targetLabel = switch (field) {
+        'entityId' => 'entity',
+        'deviceId' => 'device',
+        'areaId' => 'area',
+        'floorId' => 'floor',
+        'labelId' => 'label',
+        _ => null,
+      };
+      if (targetLabel != null) return targetLabel;
+    }
     final native = switch (field) {
       'server' => 'Home Assistant 服务器',
       'action' => '动作',
@@ -226,18 +244,20 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
       _ => null,
     };
     if (native != null) return native;
-    final value = widget.fieldLabels[field]?.trim();
-    if (value != null && value.isNotEmpty) return value;
     return _humanize(field);
   }
 
-  String _humanize(String value) => value
-      .replaceAllMapped(
-        RegExp(r'([a-z0-9])([A-Z])'),
-        (match) => '${match.group(1)} ${match.group(2)}',
-      )
-      .replaceAll(RegExp(r'[_-]+'), ' ')
-      .trim();
+  String _humanize(String value) {
+    final text = value
+        .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'),
+          (match) => '${match.group(1)} ${match.group(2)}',
+        )
+        .replaceAll(RegExp(r'[_-]+'), ' ')
+        .trim();
+    if (text.isEmpty) return text;
+    return '${text[0].toUpperCase()}${text.substring(1)}';
+  }
 
   String get _typeLabel => nodeTypeLabel(_type);
 
@@ -279,7 +299,7 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
           appBar: AppBar(
             leading: IconButton(
               onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.close_rounded),
+              icon: Icon(Icons.close_rounded),
             ),
             title: Text(_label(field)),
             actions: [
@@ -297,8 +317,8 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
               minLines: null,
               maxLines: null,
               keyboardType: TextInputType.multiline,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-              decoration: const InputDecoration(
+              style: TextStyle(fontFamily: 'monospace', fontSize: 13),
+              decoration: InputDecoration(
                 border: OutlineInputBorder(),
                 contentPadding: EdgeInsets.all(14),
               ),
@@ -349,7 +369,7 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
                     child: TextField(
                       controller: search,
                       onChanged: (_) => setSheetState(() {}),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         prefixIcon: Icon(Icons.search_rounded),
                         hintText: '搜索域或服务',
                       ),
@@ -366,7 +386,7 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
                               ? null
                               : Text(service.description, maxLines: 2),
                           trailing: service.key == current
-                              ? const Icon(Icons.check_rounded)
+                              ? Icon(Icons.check_rounded)
                               : null,
                           onTap: () => Navigator.pop(context, service.key),
                         );
@@ -393,7 +413,7 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(border: OutlineInputBorder()),
+          decoration: InputDecoration(border: OutlineInputBorder()),
         ),
         actions: [
           TextButton(
@@ -446,7 +466,7 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
                     child: TextField(
                       controller: query,
                       onChanged: (_) => setSheetState(() {}),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         prefixIcon: Icon(Icons.search_rounded),
                         hintText: '搜索名称或 ID',
                       ),
@@ -566,7 +586,7 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
         initialValue: values.contains(current) ? current : null,
         decoration: InputDecoration(
           labelText: _label('server'),
-          prefixIcon: const Icon(Icons.dns_outlined),
+          prefixIcon: Icon(Icons.dns_outlined),
         ),
         items: values
             .map(
@@ -615,6 +635,68 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
       onTap: () => _editSelectionField(field),
     ),
   );
+
+  List<String> _orderedFields(Iterable<String> fields) {
+    final available = fields.toSet();
+    final ordered = <String>[];
+    for (final field in widget.schema.fieldOrder) {
+      if (available.remove(field)) ordered.add(field);
+    }
+    for (final field in fields) {
+      if (available.remove(field)) ordered.add(field);
+    }
+    return ordered;
+  }
+
+  List<String> _targetFieldsInWebOrder(Iterable<String> fields) {
+    const preferred = ['entityId', 'deviceId', 'areaId', 'floorId', 'labelId'];
+    final available = fields.toSet();
+    return [
+      ...preferred.where(available.contains),
+      ...fields.where((field) => !preferred.contains(field)),
+    ];
+  }
+
+  Widget _targetsSection(List<String> fields) {
+    if (fields.isEmpty) return const SizedBox.shrink();
+    final visible = fields.where((field) {
+      final selected = entityIdsFromValue(_draft[field]);
+      return selected.isNotEmpty;
+    }).toList();
+    if (visible.isEmpty) visible.add(fields.first);
+    final hidden = fields.where((field) => !visible.contains(field)).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _FormSectionHeading('Targets'),
+        ...visible.map(_selectionField),
+        if (hidden.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: hidden
+                  .map(
+                    (field) => OutlinedButton.icon(
+                      onPressed: () => _editSelectionField(field),
+                      icon: Icon(Icons.add_rounded, size: 16),
+                      label: Text(_label(field)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+      ],
+    );
+  }
 
   String _selectionSummary(String field) {
     final selected = entityIdsFromValue(_draft[field]);
@@ -876,11 +958,13 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
     final current = data[field];
     final label = _humanize(field);
     if (selector['boolean'] is Map || selector.containsKey('boolean')) {
-      return SwitchListTile.adaptive(
-        contentPadding: EdgeInsets.zero,
-        title: Text(label),
-        value: current == true,
-        onChanged: (value) => _setServiceDataValue(field, value),
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: _FormSwitchField(
+          title: label,
+          value: current == true,
+          onChanged: (value) => _setServiceDataValue(field, value),
+        ),
       );
     }
     final select = selector['select'];
@@ -941,11 +1025,10 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
     final value = _draft[field];
     if (value is bool) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: SwitchListTile.adaptive(
-          contentPadding: EdgeInsets.zero,
+        padding: const EdgeInsets.only(bottom: 12),
+        child: _FormSwitchField(
+          title: _label(field),
           value: value,
-          title: Text(_label(field)),
           onChanged: (next) => _set(field, next),
         ),
       );
@@ -969,13 +1052,22 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
           (field) => !_isHiddenByNativeField(field) && !_isEntityField(field),
         )
         .toList();
-    final targetFields = <String>{
+    final orderedScalarFields = _orderedFields(scalarFields);
+    final targetFields = _targetFieldsInWebOrder(<String>{
       ...nodeEditorFields(_draft).where(_isEntityField),
       ...nodeStructuredFields(_draft).where(_isEntityField),
-    }.toList();
+    });
     final structuredFields = nodeStructuredFields(_draft)
         .where((field) => !_isEntityMapField(field) && !_isEntityField(field))
         .toList();
+    final actionNode = _type == 'api-call-service';
+    final targetIndex = actionNode ? orderedScalarFields.indexOf('data') : -1;
+    final fieldsBeforeTargets = targetIndex < 0
+        ? orderedScalarFields
+        : orderedScalarFields.take(targetIndex).toList();
+    final fieldsAfterTargets = targetIndex < 0
+        ? const <String>[]
+        : orderedScalarFields.skip(targetIndex).toList();
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -1002,10 +1094,7 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  const Icon(
-                    Icons.home_work_outlined,
-                    color: RivlenColors.wine,
-                  ),
+                  Icon(Icons.home_work_outlined, color: RivlenColors.wine),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -1020,7 +1109,7 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
                         ),
                         Text(
                           _typeLabel,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             color: RivlenColors.muted,
                           ),
@@ -1033,7 +1122,7 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
                     onPressed: () => Navigator.pop(context, <String, dynamic>{
                       '__delete': true,
                     }),
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.delete_outline_rounded,
                       color: RivlenColors.muted,
                     ),
@@ -1046,16 +1135,23 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
                   children: [
                     TextField(
                       controller: _name,
-                      decoration: const InputDecoration(
-                        labelText: '名称',
+                      decoration: InputDecoration(
+                        labelText: _label('name'),
                         prefixIcon: Icon(Icons.label_outline_rounded),
                       ),
                     ),
                     const SizedBox(height: 12),
                     if (_draft['entities'] is Map) _entityMapField(),
-                    ...scalarFields.map(_field),
-                    _serviceDataFields(),
-                    ...targetFields.map(_selectionField),
+                    if (actionNode) ...[
+                      ...fieldsBeforeTargets.map(_field),
+                      _targetsSection(targetFields),
+                      ...fieldsAfterTargets.map(_field),
+                      _serviceDataFields(),
+                    ] else ...[
+                      ...orderedScalarFields.map(_field),
+                      ...targetFields.map(_selectionField),
+                      _serviceDataFields(),
+                    ],
                     ...structuredFields.map(
                       (field) => Padding(
                         padding: const EdgeInsets.only(top: 4, bottom: 8),
@@ -1109,7 +1205,7 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
           appBar: AppBar(
             leading: IconButton(
               onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.close_rounded),
+              icon: Icon(Icons.close_rounded),
             ),
             title: const Text('高级配置'),
             actions: [
@@ -1127,8 +1223,8 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
               minLines: null,
               maxLines: null,
               keyboardType: TextInputType.multiline,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-              decoration: const InputDecoration(border: OutlineInputBorder()),
+              style: TextStyle(fontFamily: 'monospace', fontSize: 12),
+              decoration: InputDecoration(border: OutlineInputBorder()),
             ),
           ),
         ),
@@ -1172,50 +1268,97 @@ class _HaSelectionTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: RivlenColors.canvas,
-    borderRadius: BorderRadius.circular(15),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Padding(
-        padding: const EdgeInsets.all(13),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: RivlenColors.wine),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+  Widget build(BuildContext context) {
+    final borderColor = Theme.of(context).dividerColor;
+    return Material(
+      color: RivlenColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: borderColor),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: RivlenColors.wine),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: RivlenColors.ink,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: RivlenColors.muted,
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, color: RivlenColors.muted),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: RivlenColors.muted,
-              size: 19,
-            ),
-          ],
+              Icon(
+                Icons.chevron_right_rounded,
+                color: RivlenColors.muted,
+                size: 19,
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _FormSwitchField extends StatelessWidget {
+  const _FormSwitchField({
+    required this.title,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String title;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: RivlenColors.surface,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Theme.of(context).dividerColor),
+    ),
+    child: SwitchListTile.adaptive(
+      value: value,
+      title: Text(title),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 15),
+      onChanged: onChanged,
+    ),
+  );
+}
+
+class _FormSectionHeading extends StatelessWidget {
+  const _FormSectionHeading(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 2, bottom: 8),
+    child: Text(
+      title,
+      style: Theme.of(context).textTheme.titleSmall
+          ?.copyWith(fontWeight: FontWeight.w600),
     ),
   );
 }

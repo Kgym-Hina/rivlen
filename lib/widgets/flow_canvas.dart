@@ -62,6 +62,8 @@ class FlowCanvas extends StatefulWidget {
 
 const _compactCoordinateScale = 1.45;
 const _junctionDiameter = 16.0;
+const _junctionPortOffset = 19.0;
+const _junctionPortHitRadius = 13.0;
 
 class FlowCanvasState extends State<FlowCanvas> {
   static const _minimumScale = 0.38;
@@ -166,7 +168,17 @@ class FlowCanvasState extends State<FlowCanvas> {
     final placed = _placedNodesFor(widget.nodes, compact: _compactLayout);
     for (final item in placed.reversed) {
       final node = item.node;
-      if (isJunctionNode(node)) continue;
+      if (isJunctionNode(node)) {
+        final input = _inputWorld(item);
+        if ((_screen(input) - local).distance <= _junctionPortHitRadius) {
+          return _PortHit(node['id'].toString(), 0, false);
+        }
+        final output = _outputWorld(item, 0);
+        if ((_screen(output) - local).distance <= _junctionPortHitRadius) {
+          return _PortHit(node['id'].toString(), 0, true);
+        }
+        continue;
+      }
       final center = item.rect.center;
       if (nodeHasInput(node)) {
         final input = Offset(center.dx - item.rect.width / 2, center.dy);
@@ -500,22 +512,19 @@ class FlowCanvasState extends State<FlowCanvas> {
                   IconButton(
                     tooltip: '缩小',
                     onPressed: () => _zoom(0.83),
-                    icon: const Icon(Icons.remove_rounded, size: 20),
+                    icon: Icon(Icons.remove_rounded, size: 20),
                   ),
                   Container(width: 1, height: 18, color: RivlenColors.line),
                   IconButton(
                     tooltip: '适应画布',
                     onPressed: widget.onFitBounds,
-                    icon: const Icon(
-                      Icons.center_focus_strong_rounded,
-                      size: 17,
-                    ),
+                    icon: Icon(Icons.center_focus_strong_rounded, size: 17),
                   ),
                   Container(width: 1, height: 18, color: RivlenColors.line),
                   IconButton(
                     tooltip: '放大',
                     onPressed: () => _zoom(1.2),
-                    icon: const Icon(Icons.add_rounded, size: 20),
+                    icon: Icon(Icons.add_rounded, size: 20),
                   ),
                 ],
               ),
@@ -593,16 +602,9 @@ List<_PlacedNode> _placedNodesFor(
     final y = node['y'] is num
         ? (node['y'] as num).toDouble()
         : 180.0 + (index % 3) * 100;
-    final width = junction
-        ? _junctionDiameter
-        : node['type'] == 'comment'
-        ? 200.0
-        : 184.0;
-    final height = junction
-        ? _junctionDiameter
-        : node['type'] == 'comment'
-        ? 48.0
-        : 68.0;
+    final cardSize = _nodeCardSize(node);
+    final width = cardSize.width;
+    final height = cardSize.height;
     final requested = Offset(
       compact ? x * _compactCoordinateScale : x,
       compact ? y * _compactCoordinateScale : y,
@@ -656,12 +658,12 @@ Offset _collisionFreeCenter(
 }
 
 Offset _inputWorld(_PlacedNode item) => isJunctionNode(item.node)
-    ? item.rect.center
+    ? item.rect.center.translate(-_junctionPortOffset, 0)
     : Offset(item.rect.left, item.rect.center.dy);
 
 Offset _outputWorld(_PlacedNode item, int outputIndex) =>
     isJunctionNode(item.node)
-    ? item.rect.center
+    ? item.rect.center.translate(_junctionPortOffset, 0)
     : Offset(
         item.rect.right,
         item.rect.center.dy +
@@ -679,6 +681,24 @@ Path _wirePath(Offset start, Offset end) {
   return Path()
     ..moveTo(start.dx, start.dy)
     ..cubicTo(start.dx + bend, start.dy, end.dx - bend, end.dy, end.dx, end.dy);
+}
+
+Size _nodeCardSize(FlowNode node) {
+  if (isJunctionNode(node)) return const Size.square(_junctionDiameter);
+  final type = node['type']?.toString() ?? '';
+  if (type == 'comment') return const Size(176, 40);
+  final title = nodeTitle(node);
+  final rawSubtitle = nodeSubtitle(node);
+  final subtitle = rawSubtitle == nodeTypeLabel(type) ? '' : rawSubtitle;
+  final textLength = math.max(title.runes.length, subtitle.runes.length);
+  final width = (132 + textLength * 5.2).clamp(146.0, 220.0).toDouble();
+  return Size(width, subtitle.isEmpty ? 44 : 52);
+}
+
+String _displayNodeSubtitle(FlowNode node) {
+  final type = node['type']?.toString() ?? '';
+  final subtitle = nodeSubtitle(node);
+  return subtitle == nodeTypeLabel(type) ? '' : subtitle;
 }
 
 class _FlowCanvasPainter extends CustomPainter {
@@ -742,8 +762,7 @@ class _FlowCanvasPainter extends CustomPainter {
 
   void _drawGrid(Canvas canvas, Size size) {
     const spacing = 24.0;
-    final paint = Paint()
-      ..color = const Color(0xFFD9D2CC).withValues(alpha: 0.58);
+    final paint = Paint()..color = RivlenColors.line.withValues(alpha: 0.58);
     for (double x = 12; x < size.width; x += spacing) {
       for (double y = 12; y < size.height; y += spacing) {
         canvas.drawCircle(Offset(x, y), 0.8, paint);
@@ -777,7 +796,9 @@ class _FlowCanvasPainter extends CustomPainter {
         canvas.drawPath(
           path,
           Paint()
-            ..color = isSelected ? RivlenColors.coral : const Color(0xFFB6AAA1)
+            ..color = isSelected
+                ? RivlenColors.coral
+                : RivlenColors.muted.withValues(alpha: 0.72)
             ..style = PaintingStyle.stroke
             ..strokeWidth = isSelected ? 3.2 : 2.2
             ..strokeCap = StrokeCap.round,
@@ -796,25 +817,42 @@ class _FlowCanvasPainter extends CustomPainter {
     final type = node['type']?.toString() ?? '';
     final color = nodeColor(type).color;
     final selected = node['id']?.toString() == selectedNodeId;
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(13));
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(8));
     canvas.drawRRect(
-      rrect.shift(const Offset(0, 3)),
+      rrect.shift(const Offset(0, 2)),
       Paint()
-        ..color = const Color(0x192D1B16)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
+        ..color = RivlenColors.ink.withValues(alpha: 0.10)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
     );
-    canvas.drawRRect(rrect, Paint()..color = RivlenColors.surface);
+    final cardFill = type == 'comment'
+        ? RivlenColors.surface
+        : Color.alphaBlend(color.withValues(alpha: 0.14), RivlenColors.surface);
+    canvas.drawRRect(rrect, Paint()..color = cardFill);
+    canvas.drawRRect(
+      RRect.fromRectAndCorners(
+        Rect.fromLTWH(rect.left, rect.top, 4, rect.height),
+        topLeft: const Radius.circular(8),
+        bottomLeft: const Radius.circular(8),
+      ),
+      Paint()..color = color,
+    );
     canvas.drawRRect(
       rrect,
       Paint()
-        ..color = selected ? RivlenColors.coral : const Color(0xFFE8E1DB)
+        ..color = selected ? RivlenColors.coral : color.withValues(alpha: 0.38)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = selected ? 1.7 : 0.9,
+        ..strokeWidth = selected ? 1.7 : 0.8,
     );
-    final iconRect = Rect.fromLTWH(rect.left + 11, rect.top + 16, 36, 36);
+    final iconSize = math.min(28.0, rect.height - 12);
+    final iconRect = Rect.fromLTWH(
+      rect.left + 10,
+      rect.top + (rect.height - iconSize) / 2,
+      iconSize,
+      iconSize,
+    );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(iconRect, const Radius.circular(11)),
-      Paint()..color = color.withValues(alpha: 0.1),
+      RRect.fromRectAndRadius(iconRect, const Radius.circular(7)),
+      Paint()..color = color.withValues(alpha: 0.14),
     );
     _drawCenteredText(
       canvas,
@@ -825,26 +863,33 @@ class _FlowCanvasPainter extends CustomPainter {
       fontWeight: FontWeight.w700,
     );
     final title = nodeTitle(node);
-    final subtitle = nodeSubtitle(node);
+    final subtitle = _displayNodeSubtitle(node);
+    final textLeft = rect.left + 47;
+    final textWidth = rect.right - textLeft - 9;
+    final titleTop = subtitle.isEmpty
+        ? rect.top + (rect.height - 15) / 2
+        : rect.top + 9;
     _drawText(
       canvas,
       title,
-      Offset(rect.left + 57, rect.top + 14),
+      Offset(textLeft, titleTop),
       RivlenColors.ink,
-      13,
+      12,
       fontWeight: FontWeight.w600,
-      width: rect.width - 68,
+      width: textWidth,
       maxLines: 1,
     );
-    _drawText(
-      canvas,
-      subtitle,
-      Offset(rect.left + 57, rect.top + 36),
-      RivlenColors.muted,
-      10.5,
-      width: rect.width - 68,
-      maxLines: 1,
-    );
+    if (subtitle.isNotEmpty) {
+      _drawText(
+        canvas,
+        subtitle,
+        Offset(textLeft, rect.top + 28),
+        RivlenColors.muted,
+        9.5,
+        width: textWidth,
+        maxLines: 1,
+      );
+    }
     if (nodeHasInput(node)) {
       _drawPort(canvas, Offset(rect.left, rect.center.dy), RivlenColors.wine);
     }
@@ -868,17 +913,27 @@ class _FlowCanvasPainter extends CustomPainter {
 
   void _drawJunction(Canvas canvas, _PlacedNode item) {
     final center = item.rect.center;
+    final input = _inputWorld(item);
+    final output = _outputWorld(item, 0);
     final selected = item.node['id']?.toString() == selectedNodeId;
-    // The light halo keeps the wire readable underneath the dot. The dot is
-    // deliberately small, while the hit area remains the full junction rect.
+    // A junction is a draggable center with two separate wire handles. The
+    // handles stay on the wire while the larger center remains easy to move.
+    _drawJunctionPort(canvas, input, RivlenColors.wine);
+    _drawJunctionPort(
+      canvas,
+      output,
+      pendingSourceId == item.node['id']
+          ? RivlenColors.coral
+          : RivlenColors.wine,
+    );
     canvas.drawCircle(
       center,
-      selected ? 10.5 : 9,
+      selected ? 11 : 10,
       Paint()..color = RivlenColors.surface,
     );
     canvas.drawCircle(
       center,
-      selected ? 8.5 : 7,
+      selected ? 8.5 : 7.5,
       Paint()..color = selected ? RivlenColors.coral : RivlenColors.wine,
     );
     if (selected) {
@@ -891,6 +946,12 @@ class _FlowCanvasPainter extends CustomPainter {
           ..strokeWidth = 1.5,
       );
     }
+  }
+
+  void _drawJunctionPort(Canvas canvas, Offset center, Color color) {
+    canvas.drawCircle(center, 6.5, Paint()..color = RivlenColors.surface);
+    canvas.drawCircle(center, 4.2, Paint()..color = color);
+    canvas.drawCircle(center, 1.4, Paint()..color = RivlenColors.surface);
   }
 
   void _drawPort(Canvas canvas, Offset center, Color color) {
@@ -955,7 +1016,7 @@ class _FlowCanvasPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
       textAlign: TextAlign.center,
-    )..layout(maxWidth: rect.width);
+    )..layout(minWidth: rect.width, maxWidth: rect.width);
     painter.paint(
       canvas,
       Offset(rect.left, rect.top + (rect.height - painter.height) / 2),
@@ -988,14 +1049,10 @@ class _EmptyCanvasHint extends StatelessWidget {
             color: RivlenColors.surface,
             borderRadius: BorderRadius.circular(19),
           ),
-          child: const Icon(
-            Icons.add_rounded,
-            color: RivlenColors.wine,
-            size: 25,
-          ),
+          child: Icon(Icons.add_rounded, color: RivlenColors.wine, size: 25),
         ),
         const SizedBox(height: 13),
-        const Text(
+        Text(
           '双击空白处添加节点',
           style: TextStyle(
             color: RivlenColors.ink,
@@ -1004,7 +1061,7 @@ class _EmptyCanvasHint extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           '也可以从底部菜单添加',
           style: TextStyle(color: RivlenColors.muted, fontSize: 12),
         ),

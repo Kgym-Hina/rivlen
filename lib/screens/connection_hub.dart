@@ -90,12 +90,12 @@ class _ConnectionHubScreenState extends State<ConnectionHubScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const Icon(Icons.link_rounded),
+                  leading: Icon(Icons.link_rounded),
                   title: const Text('直接连接 Node-RED'),
                   onTap: () => Navigator.pop(context, 'direct'),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.qr_code_scanner_rounded),
+                  leading: Icon(Icons.qr_code_scanner_rounded),
                   title: const Text('通过网关配对'),
                   onTap: () => Navigator.pop(context, 'gateway'),
                 ),
@@ -200,7 +200,7 @@ class _ConnectionHubScreenState extends State<ConnectionHubScreen> {
                 const SizedBox(height: 22),
                 FilledButton.icon(
                   onPressed: () => _addConnection(),
-                  icon: const Icon(Icons.add_rounded),
+                  icon: Icon(Icons.add_rounded),
                   label: const Text('连接新实例'),
                   style: FilledButton.styleFrom(
                     backgroundColor: RivlenColors.wine,
@@ -215,10 +215,7 @@ class _ConnectionHubScreenState extends State<ConnectionHubScreen> {
                   const SizedBox(height: 12),
                   Text(
                     '读取已保存连接失败：$_loadError',
-                    style: const TextStyle(
-                      color: Color(0xFF9F3136),
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Color(0xFF9F3136), fontSize: 12),
                   ),
                 ],
                 const SizedBox(height: 25),
@@ -242,7 +239,7 @@ class _ConnectionHubScreenState extends State<ConnectionHubScreen> {
                       const Spacer(),
                       Text(
                         '${_connections.length}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: RivlenColors.muted,
                           fontSize: 12,
                         ),
@@ -253,7 +250,7 @@ class _ConnectionHubScreenState extends State<ConnectionHubScreen> {
                   ..._connections.map(_connectionCard),
                 ],
                 const SizedBox(height: 32),
-                const Divider(color: RivlenColors.line, height: 1),
+                Divider(color: RivlenColors.line, height: 1),
                 const SizedBox(height: 19),
                 Text(
                   '画布预览',
@@ -314,7 +311,7 @@ class _ConnectionHubScreenState extends State<ConnectionHubScreen> {
                     color: RivlenColors.wine.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.hub_outlined,
                     color: RivlenColors.wine,
                     size: 21,
@@ -329,7 +326,7 @@ class _ConnectionHubScreenState extends State<ConnectionHubScreen> {
                         connection.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           color: RivlenColors.ink,
                           fontWeight: FontWeight.w600,
@@ -340,7 +337,7 @@ class _ConnectionHubScreenState extends State<ConnectionHubScreen> {
                         connection.baseUrl,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           color: RivlenColors.muted,
                         ),
@@ -359,7 +356,7 @@ class _ConnectionHubScreenState extends State<ConnectionHubScreen> {
                   )
                 else
                   PopupMenuButton<String>(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.more_horiz_rounded,
                       color: RivlenColors.muted,
                     ),
@@ -474,7 +471,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
     appBar: AppBar(
       leading: IconButton(
         onPressed: _busy ? null : () => Navigator.pop(context),
-        icon: const Icon(Icons.close_rounded),
+        icon: Icon(Icons.close_rounded),
       ),
       title: Text(widget.initial == null ? '连接实例' : '编辑连接'),
     ),
@@ -492,7 +489,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
             TextFormField(
               controller: _name,
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: '实例名称',
                 prefixIcon: Icon(Icons.badge_outlined),
               ),
@@ -503,7 +500,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
               keyboardType: TextInputType.url,
               textInputAction: TextInputAction.next,
               autocorrect: false,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'http://192.168.1.20:1880',
                 prefixIcon: Icon(Icons.link_rounded),
               ),
@@ -543,7 +540,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                     onTap: () =>
                         setState(() => _authMode = NodeRedAuthMode.none),
                   ),
-                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  Divider(height: 1, indent: 16, endIndent: 16),
                   _AuthChoice(
                     title: '用户名和密码',
                     subtitle: '使用 Node-RED 登录凭证',
@@ -551,7 +548,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                     onTap: () =>
                         setState(() => _authMode = NodeRedAuthMode.credentials),
                   ),
-                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  Divider(height: 1, indent: 16, endIndent: 16),
                   _AuthChoice(
                     title: 'Bearer Token',
                     subtitle: '粘贴已有 Admin API 令牌',
@@ -568,7 +565,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                 controller: _username,
                 textInputAction: TextInputAction.next,
                 autocorrect: false,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: '用户名',
                   prefixIcon: Icon(Icons.person_outline_rounded),
                 ),
@@ -586,7 +583,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                 onFieldSubmitted: (_) => _connect(),
                 decoration: InputDecoration(
                   labelText: '密码',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  prefixIcon: Icon(Icons.lock_outline_rounded),
                   suffixIcon: IconButton(
                     onPressed: () =>
                         setState(() => _showPassword = !_showPassword),
@@ -613,7 +610,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                 maxLines: 3,
                 decoration: InputDecoration(
                   labelText: '访问令牌',
-                  prefixIcon: const Icon(Icons.key_outlined),
+                  prefixIcon: Icon(Icons.key_outlined),
                   suffixIcon: IconButton(
                     onPressed: () =>
                         setState(() => _showPassword = !_showPassword),
@@ -681,7 +678,7 @@ class _BrandHeader extends StatelessWidget {
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Rivlen',
             style: TextStyle(
               color: RivlenColors.ink,
@@ -702,6 +699,7 @@ class _BrandHeader extends StatelessWidget {
         ],
       ),
       const Spacer(),
+      const RivlenThemeButton(),
     ],
   );
 }
@@ -781,13 +779,10 @@ class _EmptyConnections extends StatelessWidget {
             color: RivlenColors.canvas,
             borderRadius: BorderRadius.circular(14),
           ),
-          child: const Icon(
-            Icons.device_hub_outlined,
-            color: RivlenColors.muted,
-          ),
+          child: Icon(Icons.device_hub_outlined, color: RivlenColors.muted),
         ),
         const SizedBox(width: 13),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -833,7 +828,7 @@ class _DemoCard extends StatelessWidget {
               child: CustomPaint(painter: _DemoFlowPainter()),
             ),
             const SizedBox(width: 13),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -853,7 +848,7 @@ class _DemoCard extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(
+            Icon(
               Icons.arrow_forward_ios_rounded,
               size: 15,
               color: RivlenColors.muted,
@@ -909,17 +904,14 @@ class _SectionHeading extends StatelessWidget {
     children: [
       Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           color: RivlenColors.ink,
           fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
       ),
       const SizedBox(height: 4),
-      Text(
-        subtitle,
-        style: const TextStyle(color: RivlenColors.muted, fontSize: 12),
-      ),
+      Text(subtitle, style: TextStyle(color: RivlenColors.muted, fontSize: 12)),
     ],
   );
 }
@@ -951,7 +943,7 @@ class _AuthChoice extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     color: RivlenColors.ink,
                     fontWeight: FontWeight.w600,
@@ -960,10 +952,7 @@ class _AuthChoice extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: RivlenColors.muted,
-                  ),
+                  style: TextStyle(fontSize: 11, color: RivlenColors.muted),
                 ),
               ],
             ),

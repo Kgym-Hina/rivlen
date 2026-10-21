@@ -5,14 +5,14 @@ import 'package:http/http.dart' as http;
 import '../models/flow_bundle.dart';
 import '../models/home_assistant_catalog.dart';
 import '../models/node_red_connection.dart';
+import '../models/node_editor_schema.dart';
 
 class NodeRedApi {
   NodeRedApi({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
   final Map<String, String> _tokens = {};
-  final Map<String, Future<Map<String, Map<String, String>>>>
-  _fieldLabelRequests = {};
+  final Map<String, Future<Map<String, NodeEditorSchema>>> _schemaRequests = {};
 
   Uri _uri(NodeRedConnection connection, String endpoint) {
     final input = connection.baseUrl.trim();
@@ -249,11 +249,24 @@ class NodeRedApi {
   ) async {
     try {
       final response = await _client
-          .get(_uri(connection, 'nodes'), headers: await _headers(connection))
+          .get(
+            _uri(connection, 'nodes'),
+            headers: {
+              ...await _headers(connection),
+              'Accept': 'text/html, application/json;q=0.9, */*;q=0.8',
+            },
+          )
           .timeout(const Duration(seconds: 20));
       if (response.statusCode != 200) return const [];
-      final decoded = jsonDecode(response.body);
-      if (decoded is! List) return const [];
+      dynamic decoded;
+      try {
+        decoded = jsonDecode(response.body);
+      } on FormatException {
+        return _parseInstalledNodeTypesHtml(response.body);
+      }
+      if (decoded is! List) {
+        return _parseInstalledNodeTypesHtml(response.body);
+      }
       final result = <Map<String, String>>[];
       for (final item in decoded) {
         if (item is! Map || item['types'] is! List) continue;
@@ -269,6 +282,33 @@ class NodeRedApi {
     } catch (_) {
       return const [];
     }
+  }
+
+  List<Map<String, String>> _parseInstalledNodeTypesHtml(String html) {
+    final result = <Map<String, String>>[];
+    final seen = <String>{};
+    final markerPattern = RegExp(
+      r'''<!--\s*---\s*\[red-module:([^\]]+)\]\s*---\s*-->''',
+      caseSensitive: false,
+    );
+    final templates = RegExp(
+      r'''<script\b[^>]*data-template-name\s*=\s*["']([^"']+)["'][^>]*>''',
+      caseSensitive: false,
+    ).allMatches(html);
+    final markers = markerPattern.allMatches(html).toList(growable: false);
+    var markerIndex = 0;
+    String module = '';
+    for (final template in templates) {
+      while (markerIndex < markers.length &&
+          markers[markerIndex].start < template.start) {
+        module = markers[markerIndex].group(1)?.split('/').first.trim() ?? '';
+        markerIndex++;
+      }
+      final type = template.group(1)?.trim() ?? '';
+      if (type.isEmpty || !seen.add(type)) continue;
+      result.add({'type': type, 'module': module, 'package': module});
+    }
+    return result;
   }
 
   Future<dynamic> _getNodeRedJson(
@@ -295,11 +335,10 @@ class NodeRedApi {
     return jsonDecode(response.body);
   }
 
-  /// Reads the form labels that Node-RED's own editor uses for the node
-  /// types currently present in a flow. The endpoint is part of the editor
-  /// runtime rather than the flow admin API, so an unavailable metadata
-  /// response must not prevent the flow itself from opening.
-  Future<Map<String, Map<String, String>>> getNodeFieldLabels(
+  /// Reads the form schema that Node-RED's own editor uses for the node
+  /// types currently present in a flow. The HTML template is the source of
+  /// truth for both field labels and field order.
+  Future<Map<String, NodeEditorSchema>> getNodeEditorSchemas(
     NodeRedConnection connection,
     Iterable<String> nodeTypes,
   ) {
@@ -313,30 +352,43 @@ class NodeRedApi {
     if (types.isEmpty) return Future.value(const {});
     final requestKey =
         '${connection.id}|${connection.baseUrl}|${types.join('\u001f')}';
-    final existing = _fieldLabelRequests[requestKey];
+    final existing = _schemaRequests[requestKey];
     if (existing != null) return existing;
-    final request = _loadNodeFieldLabels(connection, types);
-    _fieldLabelRequests[requestKey] = request;
+    final request = _loadNodeEditorSchemas(connection, types);
+    _schemaRequests[requestKey] = request;
     request.then<void>(
-      (_) => _fieldLabelRequests.remove(requestKey),
+      (_) => _schemaRequests.remove(requestKey),
       onError: (Object error, StackTrace stackTrace) {
-        _fieldLabelRequests.remove(requestKey);
+        _schemaRequests.remove(requestKey);
       },
     );
     return request;
   }
 
-  Future<Map<String, Map<String, String>>> _loadNodeFieldLabels(
+  Future<Map<String, Map<String, String>>> getNodeFieldLabels(
+    NodeRedConnection connection,
+    Iterable<String> nodeTypes,
+  ) async {
+    final schemas = await getNodeEditorSchemas(connection, nodeTypes);
+    return {for (final entry in schemas.entries) entry.key: entry.value.labels};
+  }
+
+  Future<Map<String, NodeEditorSchema>> _loadNodeEditorSchemas(
     NodeRedConnection connection,
     List<String> requestedTypes,
   ) async {
     final headers = await _headers(connection);
-    headers['Accept'] = 'application/json';
+    headers['Accept'] = 'text/html, application/json;q=0.9, */*;q=0.8';
     headers['Accept-Language'] = 'zh-CN,zh;q=0.9,en;q=0.8';
     final nodeResponse = await _client
         .get(_uri(connection, 'nodes'), headers: headers)
         .timeout(const Duration(seconds: 20));
     if (nodeResponse.statusCode != 200) return const {};
+
+    final html = nodeResponse.body;
+    if (html.contains('data-template-name=')) {
+      return _parseNodeEditorSchemas(html, requestedTypes.toSet(), const {});
+    }
 
     dynamic decoded;
     try {
@@ -415,14 +467,14 @@ class NodeRedApi {
         ),
       ),
     );
-    final labels = <String, Map<String, String>>{};
+    final labels = <String, NodeEditorSchema>{};
     for (final result in results) {
       labels.addAll(result);
     }
     return labels;
   }
 
-  Future<Map<String, Map<String, String>>> _loadNodeSetLabels(
+  Future<Map<String, NodeEditorSchema>> _loadNodeSetLabels(
     NodeRedConnection connection,
     _NodeSetReference set,
     Map<String, String> locale,
@@ -441,18 +493,18 @@ class NodeRedApi {
       if (response.statusCode != 200 || response.body.trim().isEmpty) {
         return const {};
       }
-      return _parseNodeEditorLabels(response.body, set.types, locale);
+      return _parseNodeEditorSchemas(response.body, set.types, locale);
     } catch (_) {
       return const {};
     }
   }
 
-  Map<String, Map<String, String>> _parseNodeEditorLabels(
+  Map<String, NodeEditorSchema> _parseNodeEditorSchemas(
     String html,
     Set<String> expectedTypes,
     Map<String, String> locale,
   ) {
-    final result = <String, Map<String, String>>{};
+    final result = <String, NodeEditorSchema>{};
     final templates = RegExp(
       r'''<script\b([^>]*)data-template-name\s*=\s*["']([^"']+)["'][^>]*>(.*?)</script>''',
       caseSensitive: false,
@@ -463,6 +515,7 @@ class NodeRedApi {
       if (type == null || !expectedTypes.contains(type)) continue;
       final body = template.group(3) ?? '';
       final fields = <String, String>{};
+      final fieldOrder = <String>[];
       final labels = RegExp(
         r'<label\b([^>]*)>(.*?)</label>',
         caseSensitive: false,
@@ -492,7 +545,18 @@ class NodeRedApi {
         final resolved = _resolveEditorLabel(text, tokens, locale);
         if (resolved.isNotEmpty) fields[field] = resolved;
       }
-      if (fields.isNotEmpty) result[type] = fields;
+      final controls = RegExp(
+        r'''<(?:input|select|textarea)\b[^>]*\bid\s*=\s*["']node-input-([^"']+)["'][^>]*>''',
+        caseSensitive: false,
+      ).allMatches(body);
+      for (final control in controls) {
+        final field = control.group(1)?.trim() ?? '';
+        if (field.isEmpty || !fields.containsKey(field)) continue;
+        if (!fieldOrder.contains(field)) fieldOrder.add(field);
+      }
+      if (fields.isNotEmpty) {
+        result[type] = NodeEditorSchema(labels: fields, fieldOrder: fieldOrder);
+      }
     }
     return result;
   }
@@ -554,13 +618,17 @@ class NodeRedApi {
         .replaceAll('&#39;', "'");
   }
 
-  String _humanizeEditorKey(String value) => value
-      .replaceAllMapped(
-        RegExp(r'([a-z0-9])([A-Z])'),
-        (match) => '${match.group(1)} ${match.group(2)}',
-      )
-      .replaceAll(RegExp(r'[_-]+'), ' ')
-      .trim();
+  String _humanizeEditorKey(String value) {
+    final text = value
+        .replaceAllMapped(
+          RegExp(r'([a-z0-9])([A-Z])'),
+          (match) => '${match.group(1)} ${match.group(2)}',
+        )
+        .replaceAll(RegExp(r'[_-]+'), ' ')
+        .trim();
+    if (text.isEmpty) return text;
+    return '${text[0].toUpperCase()}${text.substring(1)}';
+  }
 
   Future<void> dispose() async => _client.close();
 }

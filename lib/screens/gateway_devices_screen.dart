@@ -99,7 +99,7 @@ class _GatewayDevicesScreenState extends State<GatewayDevicesScreen> {
         IconButton(
           tooltip: '刷新',
           onPressed: _loading ? null : _load,
-          icon: const Icon(Icons.refresh_rounded),
+          icon: Icon(Icons.refresh_rounded),
         ),
       ],
     ),
@@ -115,7 +115,7 @@ class _GatewayDevicesScreenState extends State<GatewayDevicesScreen> {
                 children: [
                   Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           '已授权',
                           style: TextStyle(
@@ -129,7 +129,7 @@ class _GatewayDevicesScreenState extends State<GatewayDevicesScreen> {
                       if (_snapshot != null)
                         Text(
                           '${_snapshot!.devices.length}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: RivlenColors.muted,
                             fontSize: 13,
                           ),
@@ -139,10 +139,7 @@ class _GatewayDevicesScreenState extends State<GatewayDevicesScreen> {
                   const SizedBox(height: 6),
                   Text(
                     Uri.parse(widget.connection.gatewayUrl).host,
-                    style: const TextStyle(
-                      color: RivlenColors.muted,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: RivlenColors.muted, fontSize: 13),
                   ),
                   const SizedBox(height: 18),
                   if (_snapshot?.canManage == false)
@@ -193,7 +190,7 @@ class _GatewayDevicesScreenState extends State<GatewayDevicesScreen> {
                   color: RivlenColors.wine.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(13),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.devices_outlined,
                   size: 20,
                   color: RivlenColors.wine,
@@ -205,7 +202,7 @@ class _GatewayDevicesScreenState extends State<GatewayDevicesScreen> {
                   device.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: RivlenColors.ink,
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
@@ -237,7 +234,7 @@ class _GatewayDevicesScreenState extends State<GatewayDevicesScreen> {
                         height: 15,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.link_off_rounded, size: 17),
+                    : Icon(Icons.link_off_rounded, size: 17),
                 label: const Text('撤销授权'),
                 style: TextButton.styleFrom(
                   foregroundColor: const Color(0xFFAC3637),
@@ -256,21 +253,17 @@ class _GatewayDevicesScreenState extends State<GatewayDevicesScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.cloud_off_outlined,
-            color: RivlenColors.muted,
-            size: 38,
-          ),
+          Icon(Icons.cloud_off_outlined, color: RivlenColors.muted, size: 38),
           const SizedBox(height: 12),
           Text(
             _error ?? '无法读取授权设备。',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: RivlenColors.muted),
+            style: TextStyle(color: RivlenColors.muted),
           ),
           const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: _load,
-            icon: const Icon(Icons.refresh_rounded),
+            icon: Icon(Icons.refresh_rounded),
             label: const Text('重试'),
           ),
         ],
@@ -307,13 +300,10 @@ class _DetailLine extends StatelessWidget {
         width: 66,
         child: Text(
           label,
-          style: const TextStyle(color: RivlenColors.muted, fontSize: 12),
+          style: TextStyle(color: RivlenColors.muted, fontSize: 12),
         ),
       ),
-      Text(
-        value,
-        style: const TextStyle(color: RivlenColors.ink, fontSize: 12),
-      ),
+      Text(value, style: TextStyle(color: RivlenColors.ink, fontSize: 12)),
     ],
   );
 }
@@ -332,7 +322,7 @@ class _Badge extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
     child: Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         color: RivlenColors.wine,
         fontSize: 10,
         fontWeight: FontWeight.w600,
@@ -363,7 +353,7 @@ class _InfoCard extends StatelessWidget {
         Expanded(
           child: Text(
             message,
-            style: const TextStyle(color: RivlenColors.muted, fontSize: 13),
+            style: TextStyle(color: RivlenColors.muted, fontSize: 13),
           ),
         ),
       ],
