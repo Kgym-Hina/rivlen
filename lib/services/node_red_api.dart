@@ -84,13 +84,96 @@ class NodeRedApi {
   }
 
   Future<Map<String, String>> _headers(NodeRedConnection connection) async {
-    final token = await _authToken(connection);
+    String? token;
+    try {
+      token = await _authToken(connection);
+    } on NodeRedApiException catch (error) {
+      // Some installations put Node-RED behind a Basic-auth reverse proxy
+      // and do not expose the OAuth token endpoint. Keep those connections
+      // usable without weakening normal invalid-credential errors.
+      if (connection.authMode != NodeRedAuthMode.credentials ||
+          (error.statusCode != 400 && error.statusCode != 401)) {
+        rethrow;
+      }
+      token = null;
+    }
     return {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
       'Node-RED-API-Version': 'v2',
       if (token != null) 'Authorization': 'Bearer $token',
+      if (token == null && connection.authMode == NodeRedAuthMode.credentials)
+        'Authorization':
+            'Basic ${base64Encode(utf8.encode('${connection.username}:${connection.password}'))}',
     };
+  }
+
+  /// Builds the WebSocket endpoint used by Node-RED's editor comms channel.
+  /// The gateway exposes the same path below `/api/node-red`.
+  Uri webSocketUri(NodeRedConnection connection) {
+    final httpUri = _uri(connection, 'comms');
+    return httpUri.replace(scheme: httpUri.scheme == 'https' ? 'wss' : 'ws');
+  }
+
+  Future<Map<String, String>> webSocketHeaders(
+    NodeRedConnection connection,
+  ) async {
+    try {
+      final token = await _authToken(connection);
+      return {if (token != null) 'Authorization': 'Bearer $token'};
+    } on NodeRedApiException catch (error) {
+      if (connection.authMode != NodeRedAuthMode.credentials ||
+          (error.statusCode != 400 && error.statusCode != 401)) {
+        rethrow;
+      }
+      return {
+        'Authorization':
+            'Basic ${base64Encode(utf8.encode('${connection.username}:${connection.password}'))}',
+      };
+    }
+  }
+
+  Future<String?> webSocketAuthToken(NodeRedConnection connection) async {
+    try {
+      return await _authToken(connection);
+    } on NodeRedApiException catch (error) {
+      if (connection.authMode == NodeRedAuthMode.credentials &&
+          (error.statusCode == 400 || error.statusCode == 401)) {
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> inject(NodeRedConnection connection, String nodeId) async {
+    final endpoint = 'inject/${Uri.encodeComponent(nodeId)}';
+    var headers = await _headers(connection);
+    headers.remove('Node-RED-API-Version');
+    var response = await _client
+        .post(_uri(connection, endpoint), headers: headers)
+        .timeout(const Duration(seconds: 20));
+    if (response.statusCode == 401 &&
+        connection.authMode == NodeRedAuthMode.credentials) {
+      _tokens.remove(connection.id);
+      headers = await _headers(connection);
+      headers.remove('Node-RED-API-Version');
+      response = await _client
+          .post(_uri(connection, endpoint), headers: headers)
+          .timeout(const Duration(seconds: 20));
+    }
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      _tokens.remove(connection.id);
+      throw NodeRedApiException(
+        '无法触发节点，请确认账号具有 Node-RED 编辑权限。',
+        statusCode: response.statusCode,
+      );
+    }
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw NodeRedApiException(
+        '触发节点失败（HTTP ${response.statusCode}）。${response.body.trim()}',
+        statusCode: response.statusCode,
+      );
+    }
   }
 
   Future<FlowBundle> getFlows(NodeRedConnection connection) async {

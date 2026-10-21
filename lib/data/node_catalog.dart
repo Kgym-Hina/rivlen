@@ -34,6 +34,83 @@ const nodeKinds = <NodeKind>[
   NodeKind('comment', 'Comment', 'Other', '在画布上添加说明'),
 ];
 
+/// The Home Assistant palette keeps its node type names in English because
+/// that is what Node-RED stores in a flow. These labels are used in the
+/// mobile palette where there is no Node-RED help sidebar to explain them.
+const _homeAssistantNodeLabels = <String, String>{
+  'api-call-service': '调用服务',
+  'api-current-state': '读取当前状态',
+  'api-get-history': '获取历史状态',
+  'api-render-template': '渲染模板',
+  'ha-api': 'Home Assistant API',
+  'ha-binary-sensor': '二值传感器',
+  'ha-button': '按钮事件',
+  'ha-device': '设备状态',
+  'ha-events-calendar': '日历事件',
+  'ha-fire-event': '触发事件',
+  'ha-get-entities': '获取实体',
+  'ha-number': '数字实体',
+  'ha-select': '选择实体',
+  'ha-sensor': '传感器状态',
+  'ha-sentence': '语句触发',
+  'ha-switch': '开关实体',
+  'ha-tag': '标签扫描',
+  'ha-text': '文本实体',
+  'ha-time': '时间触发',
+  'ha-time-entity': '时间实体触发',
+  'ha-wait-until': '等待条件',
+  'ha-webhook': 'Webhook 触发',
+  'ha-zone': '区域事件',
+  'ha_entity_filter': '实体筛选',
+  'poll-state': '轮询状态',
+  'server-events': '事件监听',
+  'server-state-changed': '状态变化',
+  'trigger-state': '状态触发',
+};
+
+const _homeAssistantNodeDescriptions = <String, String>{
+  'api-call-service': '调用 Home Assistant 服务，并把结果继续传给后续节点',
+  'api-current-state': '读取实体当前状态、属性或上下文',
+  'api-get-history': '查询实体的历史状态记录',
+  'api-render-template': '使用 Home Assistant 模板生成消息内容',
+  'ha-api': '调用 Home Assistant HTTP API',
+  'ha-binary-sensor': '创建或更新二值传感器实体',
+  'ha-button': '监听 Home Assistant 按钮事件',
+  'ha-device': '读取或设置设备相关状态',
+  'ha-events-calendar': '监听 Home Assistant 日历事件',
+  'ha-fire-event': '向 Home Assistant 发布事件',
+  'ha-get-entities': '按条件查询 Home Assistant 实体',
+  'ha-number': '创建或更新数字实体',
+  'ha-select': '创建或更新选择实体',
+  'ha-sensor': '创建或更新传感器实体',
+  'ha-sentence': '接收语句触发结果并输出消息',
+  'ha-switch': '创建或更新开关实体',
+  'ha-tag': '监听 Home Assistant 标签扫描',
+  'ha-text': '创建或更新文本实体',
+  'ha-time': '按 Home Assistant 时间触发流程',
+  'ha-time-entity': '监听时间实体的变化',
+  'ha-wait-until': '等待实体满足条件后继续流程',
+  'ha-webhook': '接收 Home Assistant Webhook 请求',
+  'ha-zone': '监听实体进入或离开区域',
+  'ha_entity_filter': '按域、区域或属性筛选实体',
+  'poll-state': '按间隔轮询实体状态',
+  'server-events': '监听 Home Assistant 事件总线',
+  'server-state-changed': '监听实体状态变化',
+  'trigger-state': '按条件触发并输出实体状态',
+};
+
+String nodeTypeDescription(String type, [String? fallback]) {
+  final homeAssistant = _homeAssistantNodeDescriptions[type];
+  if (homeAssistant != null) return homeAssistant;
+  final builtIn = nodeKinds
+      .where((item) => item.type == type)
+      .map((item) => item.description)
+      .firstOrNull;
+  if (builtIn != null) return builtIn;
+  final value = fallback?.trim() ?? '';
+  return value.isEmpty ? '支持在 Flow 中配置此节点' : value;
+}
+
 final _random = Random.secure();
 
 String createNodeId() =>
@@ -51,6 +128,8 @@ String nodeTitle(FlowNode node) {
 }
 
 String nodeTypeLabel(String type) {
+  final homeAssistant = _homeAssistantNodeLabels[type];
+  if (homeAssistant != null) return homeAssistant;
   final known = nodeKinds
       .where((item) => item.type == type)
       .map((item) => item.title)
@@ -156,25 +235,91 @@ int nodeOutputCount(FlowNode node) {
   return int.tryParse(node['outputs']?.toString() ?? '') ?? 0;
 }
 
-bool nodeHasInput(FlowNode node) => !const {
+const _nodesWithoutPorts = <String>{
+  'comment',
+  'junction',
+  'server',
+  'ha-device-config',
+  'ha-entity-config',
+  'ha-update-config',
+  'tab',
+  'subflow',
+};
+
+const _inputOnlyNodes = <String>{
+  'debug',
+  'file',
+  'http response',
+  'link out',
+  'mqtt out',
+  'status',
+  'tcp out',
+  'udp out',
+  'websocket out',
+};
+
+const _outputOnlyNodes = <String>{
   'inject',
   'catch',
   'complete',
   'link in',
   'http in',
   'mqtt in',
-  'comment',
-  'junction',
-}.contains(node['type']);
+  'tcp in',
+  'udp in',
+  'watch',
+  'websocket in',
+  'server-events',
+  'server-state-changed',
+  'poll-state',
+  'trigger-state',
+  'ha-button',
+  'ha-events-calendar',
+  'ha-sentence',
+  'ha-tag',
+  'ha-time',
+  'ha-time-entity',
+  'ha-webhook',
+  'ha-zone',
+};
 
-bool nodeHasOutput(FlowNode node) => !const {
-  'debug',
-  'http response',
-  'link out',
-  'mqtt out',
-  'comment',
-  'junction',
-}.contains(node['type']);
+bool _hasExplicitPortValue(FlowNode node, String key) =>
+    node.containsKey(key) && node[key] != null;
+
+bool nodeHasInput(FlowNode node) {
+  final type = node['type']?.toString() ?? '';
+  if (_nodesWithoutPorts.contains(type)) return false;
+  if (_inputOnlyNodes.contains(type)) return true;
+  if (_outputOnlyNodes.contains(type)) return false;
+  if (_hasExplicitPortValue(node, 'inputs')) {
+    return (int.tryParse(node['inputs'].toString()) ?? 0) > 0;
+  }
+  // Palette entries do not have runtime wiring yet. They are treated as a
+  // normal two-sided node so they remain available when adding to a wire.
+  if (!node.containsKey('wires') && !node.containsKey('outputs')) return true;
+  // A runtime node with an empty wires array is usually an input-only sink
+  // (Debug, Status, File, MQTT Out, and custom sinks use this shape). The
+  // explicit output-only list above handles the opposite kind of node.
+  if (node.containsKey('wires')) return true;
+  return nodeOutputCount(node) > 0;
+}
+
+bool nodeHasOutput(FlowNode node) {
+  final type = node['type']?.toString() ?? '';
+  if (_nodesWithoutPorts.contains(type)) return false;
+  if (_inputOnlyNodes.contains(type)) return false;
+  if (_outputOnlyNodes.contains(type)) return true;
+  if (_hasExplicitPortValue(node, 'outputs')) {
+    return (int.tryParse(node['outputs'].toString()) ?? 0) > 0;
+  }
+  // A runtime node with a wires array has exactly as many outputs as that
+  // array. An empty array (for example Debug) must not get a phantom port.
+  if (node.containsKey('wires')) return nodeOutputCount(node) > 0;
+  return true;
+}
+
+bool isConfigurationNode(FlowNode node) =>
+    _nodesWithoutPorts.contains(node['type']?.toString());
 
 RivlenNodeColor nodeColor(String type) {
   if (type.startsWith('api-') ||

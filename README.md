@@ -19,6 +19,8 @@ proxy path, for example `https://automation.example.com/nodered`.
 ## Connection and deployment
 
 - Reads and deploys through `GET /flows` and `POST /flows`.
+- Can trigger an Inject node and subscribe to the Node-RED debug stream; the
+  gateway proxies these as `POST /inject/{nodeId}` and WebSocket `/comms`.
 - Supports unauthenticated instances, Node-RED username/password login, and a
   manually supplied Bearer token.
 - Supports pairing to Rivlen Gateway by scanning a QR code or importing its

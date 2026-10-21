@@ -12,6 +12,7 @@ import '../services/node_red_api.dart';
 import '../theme.dart';
 import '../widgets/flow_canvas.dart';
 import '../widgets/home_assistant_node_editor.dart';
+import 'debug_screen.dart';
 
 bool isHomeAssistantNodeType(String type) {
   const exact = {
@@ -60,6 +61,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
   bool _deploying = false;
   bool _allowPop = false;
   bool _draggingNode = false;
+  String? _injectingNodeId;
   List<List<FlowNode>> _undoStack = [];
   List<List<FlowNode>> _redoStack = [];
   List<String> _recentTypes = [];
@@ -125,7 +127,9 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
   List<FlowNode> get _visibleNodes => _nodes
       .where(
         (node) =>
-            node['type'] != 'tab' && node['z']?.toString() == _activeTabId,
+            node['type'] != 'tab' &&
+            node['z']?.toString() == _activeTabId &&
+            !isConfigurationNode(node),
       )
       .toList(growable: false);
 
@@ -202,7 +206,11 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       final type = item['type']?.trim() ?? '';
       if (type.isEmpty ||
           !seen.add(type) ||
-          nodeKinds.any((kind) => kind.type == type)) {
+          nodeKinds.any((kind) => kind.type == type) ||
+          isConfigurationNode({'type': type}) ||
+          type.startsWith('x-tmpl-') ||
+          type == 'ha_sidebar' ||
+          type == 'ha_sidebar_toolbar') {
         continue;
       }
       final module = item['module']?.trim() ?? '';
@@ -213,7 +221,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
           type,
           nodeTypeLabel(type),
           isHa ? 'Home Assistant' : '已安装节点',
-          module.isEmpty ? type : module,
+          nodeTypeDescription(type, module.isEmpty ? type : module),
         ),
       );
     }
@@ -376,6 +384,29 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       );
       _commit(next);
       _showMessage('连线已删除 · 可撤销');
+    }
+  }
+
+  Future<void> _injectNode(String id) async {
+    final node = _nodes.firstWhere(
+      (item) => item['id']?.toString() == id,
+      orElse: () => <String, dynamic>{},
+    );
+    if (node.isEmpty || node['type']?.toString() != 'inject') return;
+    if (_isDemo) {
+      _showMessage('示例画布未连接 Node-RED');
+      return;
+    }
+    setState(() => _injectingNodeId = id);
+    try {
+      await _api.inject(widget.connection, id);
+      if (mounted) _showMessage('已触发 ${nodeTitle(node)}');
+    } catch (error) {
+      if (mounted) {
+        _showMessage(error.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _injectingNodeId = null);
     }
   }
 
@@ -1029,6 +1060,12 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                 onTap: () => Navigator.pop(context, 'fit'),
               ),
               ListTile(
+                leading: Icon(Icons.bug_report_outlined),
+                title: const Text('调试'),
+                subtitle: const Text('查看 Node-RED debug 输出'),
+                onTap: () => Navigator.pop(context, 'debug'),
+              ),
+              ListTile(
                 leading: Icon(Icons.content_copy_rounded),
                 title: const Text('复制 Flow JSON'),
                 onTap: () => Navigator.pop(context, 'copy'),
@@ -1058,6 +1095,13 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
         break;
       case 'fit':
         _canvasKey.currentState?.resetView();
+        break;
+      case 'debug':
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) => DebugScreen(connection: widget.connection),
+          ),
+        );
         break;
       case 'copy':
         await Clipboard.setData(ClipboardData(text: jsonEncode(_nodes)));
@@ -1417,6 +1461,8 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                 node: _selectedNode!,
                 onEdit: () => _editNode(_selectedNodeId!),
                 onDelete: () => _deleteNode(_selectedNodeId!),
+                onInject: () => _injectNode(_selectedNodeId!),
+                isInjecting: _injectingNodeId == _selectedNodeId,
               ),
             _BottomBar(
               tabLabel: tabLabel,
@@ -1436,11 +1482,15 @@ class _SelectedNodeBar extends StatelessWidget {
     required this.node,
     required this.onEdit,
     required this.onDelete,
+    required this.onInject,
+    required this.isInjecting,
   });
 
   final FlowNode node;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onInject;
+  final bool isInjecting;
 
   @override
   Widget build(BuildContext context) {
@@ -1483,6 +1533,23 @@ class _SelectedNodeBar extends StatelessWidget {
                   ],
                 ),
               ),
+              if (type == 'inject')
+                TextButton.icon(
+                  onPressed: isInjecting ? null : onInject,
+                  icon: isInjecting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: const Text('触发'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: RivlenColors.green,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 36),
+                  ),
+                ),
               TextButton.icon(
                 onPressed: onEdit,
                 icon: Icon(Icons.edit_outlined, size: 17),

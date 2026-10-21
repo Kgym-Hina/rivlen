@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/skip2/go-qrcode"
 )
 
@@ -226,6 +227,8 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/v1/devices", s.handleDevices)
 	mux.HandleFunc("/api/v1/devices/", s.handleDevice)
 	mux.HandleFunc("/api/node-red/flows", s.handleFlows)
+	mux.HandleFunc("/api/node-red/inject/", s.handleNodeRedInject)
+	mux.HandleFunc("/api/node-red/comms", s.handleNodeRedComms)
 	mux.HandleFunc("/api/node-red/nodes", s.handleNodeRedMetadata)
 	mux.HandleFunc("/api/node-red/nodes/", s.handleNodeRedMetadata)
 	mux.HandleFunc("/api/node-red/locales/nodes", s.handleNodeRedMetadata)
@@ -512,6 +515,132 @@ func (s *server) handleFlows(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(response.StatusCode)
 	_, _ = w.Write(responseBody)
+}
+
+func (s *server) handleNodeRedInject(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, http.MethodPost)
+		return
+	}
+	if _, ok := s.authorize(w, r); !ok {
+		return
+	}
+	path := strings.TrimPrefix(r.URL.Path, "/api/node-red")
+	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
+	if len(parts) != 2 || parts[0] != "inject" || !validMetadataPathParts(parts, 2, 2) {
+		http.NotFound(w, r)
+		return
+	}
+	response, err := s.nodeRedRequestPath(r.Context(), http.MethodPost, path, nil, nil)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "Could not reach Node-RED")
+		return
+	}
+	defer response.Body.Close()
+	responseBody, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "Could not read the Node-RED response")
+		return
+	}
+	if value := response.Header.Get("Content-Type"); value != "" {
+		w.Header().Set("Content-Type", value)
+	}
+	w.WriteHeader(response.StatusCode)
+	_, _ = w.Write(responseBody)
+}
+
+var nodeRedWebSocketUpgrader = websocket.Upgrader{
+	ReadBufferSize:  16 << 10,
+	WriteBufferSize: 16 << 10,
+}
+
+func (s *server) handleNodeRedComms(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, http.MethodGet)
+		return
+	}
+	if !s.sameOrigin(r) {
+		writeError(w, http.StatusForbidden, "Origin is not allowed")
+		return
+	}
+	if _, ok := s.authorize(w, r); !ok {
+		return
+	}
+
+	nodeRedHeaders := make(http.Header)
+	upstreamToken := ""
+	if s.cfg.nodeRedAuthMode == "admin" {
+		var err error
+		upstreamToken, err = s.nodeRedAuthToken(r.Context(), false)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "Could not authenticate with Node-RED")
+			return
+		}
+		if upstreamToken != "" {
+			nodeRedHeaders.Set("Authorization", "Bearer "+upstreamToken)
+		}
+	} else if s.cfg.nodeRedAuthMode == "basic" {
+		nodeRedHeaders.Set("Authorization", basicAuthorization(s.cfg.nodeRedUsername, s.cfg.nodeRedPassword))
+	}
+
+	target := *s.cfg.nodeRedURL
+	prefix := strings.TrimRight(target.Path, "/")
+	target.Path = prefix + "/comms"
+	target.RawPath = ""
+	target.RawQuery = ""
+	target.Fragment = ""
+	if target.Scheme == "https" {
+		target.Scheme = "wss"
+	} else {
+		target.Scheme = "ws"
+	}
+	upstream, _, err := websocket.DefaultDialer.DialContext(
+		r.Context(),
+		target.String(),
+		nodeRedHeaders,
+	)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "Could not connect to Node-RED debug channel")
+		return
+	}
+	client, err := nodeRedWebSocketUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		_ = upstream.Close()
+		return
+	}
+	defer client.Close()
+	defer upstream.Close()
+
+	// Node-RED authenticates comms with a small message after the upgrade. Do
+	// this inside the gateway so the mobile app only needs its device token.
+	if upstreamToken != "" {
+		if err := upstream.WriteJSON(map[string]string{"auth": upstreamToken}); err != nil {
+			return
+		}
+	}
+
+	closed := make(chan struct{}, 2)
+	go relayWebSocket(upstream, client, closed)
+	go relayWebSocket(client, upstream, closed)
+	<-closed
+}
+
+func relayWebSocket(destination, source *websocket.Conn, closed chan<- struct{}) {
+	defer func() { closed <- struct{}{} }()
+	for {
+		messageType, payload, err := source.ReadMessage()
+		if err != nil {
+			return
+		}
+		if err := destination.WriteMessage(messageType, payload); err != nil {
+			return
+		}
+	}
+}
+
+func basicAuthorization(username, password string) string {
+	credentials := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
+	return "Basic " + credentials
 }
 
 // handleNodeRedMetadata exposes only the read-only editor metadata endpoints

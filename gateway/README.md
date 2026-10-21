@@ -4,7 +4,8 @@ Rivlen Gateway exposes a small, authenticated Node-RED Admin API surface on a
 separate port. Node-RED stays on the private network; the gateway reads and
 deploys flows through its local Admin API connection.
 
-The public API forwards `GET /flows`, `POST /flows`, and a small read-only
+The public API forwards `GET /flows`, `POST /flows`, `POST /inject/{nodeId}`,
+the authenticated Node-RED debug WebSocket at `/comms`, and a small read-only
 Home Assistant metadata surface under `/homeassistant/{resource}/{serverId}`.
 The metadata surface is allowlisted for the resources exposed by the installed
 Home Assistant Node-RED node package; it is not a general-purpose proxy.
