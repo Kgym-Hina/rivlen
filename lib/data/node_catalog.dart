@@ -85,13 +85,16 @@ String nodeSubtitle(FlowNode node) {
         ? node['topic'].toString()
         : '未设置主题';
   }
-  final domain = node['domain']?.toString().trim() ?? '';
+  final domain = _firstNonEmpty([node['domain'], node['service_domain']]) ?? '';
   final service = node['service']?.toString().trim() ?? '';
   final action = node['action']?.toString().trim() ?? '';
   final entity = _firstNonEmpty([
     node['entityId'],
     node['entity_id'],
+    node['entityidfilter'],
+    node['entity_id_filter'],
     node['entity'],
+    node['entities'],
     node['deviceId'],
     node['device_id'],
     node['topic'],
@@ -108,14 +111,32 @@ String nodeSubtitle(FlowNode node) {
 
 String? _firstNonEmpty(Iterable<dynamic> values) {
   for (final value in values) {
-    final text = value?.toString().trim() ?? '';
+    final text = value is List
+        ? value
+              .map((item) => item?.toString().trim() ?? '')
+              .where((item) => item.isNotEmpty)
+              .join(', ')
+        : value?.toString().trim() ?? '';
     if (text.isNotEmpty) return text;
   }
   return null;
 }
 
 String? _firstScalarDetail(FlowNode node) {
-  const ignored = {'id', 'type', 'z', 'x', 'y', 'wires', 'name', 'label'};
+  const ignored = {
+    'id',
+    'type',
+    'z',
+    'x',
+    'y',
+    'wires',
+    'name',
+    'label',
+    'server',
+    'version',
+    'outputs',
+    'debugenabled',
+  };
   for (final entry in node.entries) {
     if (ignored.contains(entry.key)) continue;
     final value = entry.value;

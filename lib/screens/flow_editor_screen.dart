@@ -1520,10 +1520,10 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
           .where((kind) => kind.type == _draft['type'])
           .map((kind) => kind.title)
           .firstOrNull ??
-      _draft['type']?.toString() ??
-      'Node';
+      nodeTypeLabel(_draft['type']?.toString() ?? 'Node');
 
   Future<void> _editComplexField(String field) async {
+    _applyControllers();
     final result = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         fullscreenDialog: true,
@@ -1543,6 +1543,7 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
   }
 
   Future<void> _editRawJson() async {
+    _applyControllers();
     final result = await Navigator.of(context).push<FlowNode>(
       MaterialPageRoute(
         fullscreenDialog: true,
@@ -1559,6 +1560,7 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
   }
 
   Future<void> _editStructuredField(String field) async {
+    _applyControllers();
     final result = await Navigator.of(context).push<_NodeValueEditResult>(
       MaterialPageRoute(
         fullscreenDialog: true,
@@ -1571,8 +1573,7 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
     if (result != null) setState(() => _draft[field] = result.value);
   }
 
-  void _save() {
-    _draft['name'] = _name.text.trim();
+  void _applyControllers() {
     for (final entry in _fields.entries) {
       final original = _draft[entry.key];
       final text = entry.value.text.trim();
@@ -1586,6 +1587,11 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
         _draft[entry.key] = text;
       }
     }
+  }
+
+  void _save() {
+    _draft['name'] = _name.text.trim();
+    _applyControllers();
     Navigator.pop(context, _draft);
   }
 
@@ -1767,6 +1773,7 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
     'url' => '请求地址',
     'qos' => 'QoS',
     'entityId' || 'entity_id' => '实体',
+    'entityidfilter' || 'entity_id_filter' => '实体筛选',
     'server' => '服务器',
     'domain' => '域',
     'service' => '服务',
