@@ -30,7 +30,7 @@ Configuration:
 | --- | --- | --- |
 | `RIVLEN_GATEWAY_LISTEN` | `127.0.0.1:8787` | Gateway bind address and port |
 | `RIVLEN_NODE_RED_URL` | `http://127.0.0.1:1880` | Node-RED base URL, including any reverse proxy path |
-| `RIVLEN_PUBLIC_URL` | Request host | URL encoded in pairing files; set it when using a public reverse proxy |
+| `RIVLEN_PUBLIC_URL` | Request host | Optional fixed URL encoded in pairing files; leave it blank to use the browser request URL |
 | `RIVLEN_PAIRING_PASSWORD` | Required | Custom password used for pairing |
 | `RIVLEN_DATA_FILE` | `./data/gateway.json` | Persistent gateway ID, device names, token hashes, and access times |
 | `RIVLEN_NODE_RED_AUTH_MODE` | `admin` | Use `basic` for a Home Assistant App port protected by Home Assistant credentials |
@@ -50,6 +50,12 @@ For the Home Assistant Community Node-RED App's direct port, set
 password using `RIVLEN_NODE_RED_USERNAME` and `RIVLEN_NODE_RED_PASSWORD`. The
 App checks those credentials through Home Assistant before forwarding requests
 to Node-RED; this is separate from Node-RED's Admin API token login.
+
+When the gateway is behind a reverse proxy, leave `RIVLEN_PUBLIC_URL` empty if
+the proxy preserves the browser `Host` and `X-Forwarded-Proto` headers. New
+pairing files then use the URL currently shown in the browser. Set the variable
+only when the proxy does not preserve those headers or when a fixed canonical
+URL is required.
 
 ## Connect Rivlen
 
