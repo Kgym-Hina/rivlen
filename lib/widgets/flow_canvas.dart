@@ -60,9 +60,14 @@ class FlowCanvas extends StatefulWidget {
   State<FlowCanvas> createState() => FlowCanvasState();
 }
 
+const _compactCoordinateScale = 1.45;
+
 class FlowCanvasState extends State<FlowCanvas> {
   static const _minimumScale = 0.38;
   static const _maximumScale = 2.1;
+  // Node-RED stores desktop-sized coordinates. On a phone, expanding the
+  // coordinate distance before fitting the canvas keeps nodes and wires from
+  // collapsing into one another while preserving the original flow values.
   double _scale = 1;
   Offset _translation = Offset.zero;
   Offset _lastLocal = Offset.zero;
@@ -87,9 +92,13 @@ class FlowCanvasState extends State<FlowCanvas> {
   Offset? _lastTapWorld;
   Size? _viewportSize;
 
+  double get _coordinateScale => _compactLayout ? _compactCoordinateScale : 1.0;
+
   Offset get worldCenter {
     final size = _viewportSize;
-    return size == null ? Offset.zero : _toWorld(size.center(Offset.zero));
+    return size == null
+        ? Offset.zero
+        : _toFlowWorld(_toWorld(size.center(Offset.zero)));
   }
 
   void resetView() {
@@ -149,6 +158,8 @@ class FlowCanvasState extends State<FlowCanvas> {
   }
 
   Offset _toWorld(Offset point) => (point - _translation) / _scale;
+
+  Offset _toFlowWorld(Offset displayWorld) => displayWorld / _coordinateScale;
 
   _PortHit? _portAt(Offset local) {
     final placed = _placedNodesFor(widget.nodes, compact: _compactLayout);
@@ -302,7 +313,7 @@ class FlowCanvasState extends State<FlowCanvas> {
       if (_moved) {
         final movement = _moveStarted ? delta : local - _startLocal;
         if (movement.distance > 0) {
-          widget.onMoveNode(_dragNodeId!, movement / _scale);
+          widget.onMoveNode(_dragNodeId!, movement / _scale / _coordinateScale);
         }
         _moveStarted = true;
       }
@@ -341,7 +352,7 @@ class FlowCanvasState extends State<FlowCanvas> {
           widget.onAddAtWireEnd(
             source.nodeId,
             source.outputIndex,
-            _toWorld(local),
+            _toFlowWorld(_toWorld(local)),
           );
           setState(() {
             _pendingSourceId = null;
@@ -389,11 +400,11 @@ class FlowCanvasState extends State<FlowCanvas> {
       if (_moveStarted) {
         widget.onMoveEnd();
       } else {
-        _handleTap(_dragNodeId, _toWorld(local));
+        _handleTap(_dragNodeId, _toFlowWorld(_toWorld(local)));
       }
       return;
     }
-    if (!_moved) _handleTap(null, _toWorld(local));
+    if (!_moved) _handleTap(null, _toFlowWorld(_toWorld(local)));
     if (mounted) {
       setState(() {
         _wireSource = null;
@@ -572,7 +583,12 @@ List<_PlacedNode> _placedNodesFor(
     final width = node['type'] == 'comment' ? 200.0 : 184.0;
     final height = node['type'] == 'comment' ? 48.0 : 68.0;
     final center = compact
-        ? _collisionFreeCenter(Offset(x, y), width, height, placed)
+        ? _collisionFreeCenter(
+            Offset(x * _compactCoordinateScale, y * _compactCoordinateScale),
+            width,
+            height,
+            placed,
+          )
         : Offset(x, y);
     final rect = Rect.fromCenter(center: center, width: width, height: height);
     placed.add(_PlacedNode(node, rect, index));

@@ -226,6 +226,10 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("/api/v1/devices", s.handleDevices)
 	mux.HandleFunc("/api/v1/devices/", s.handleDevice)
 	mux.HandleFunc("/api/node-red/flows", s.handleFlows)
+	mux.HandleFunc("/api/node-red/nodes", s.handleNodeRedMetadata)
+	mux.HandleFunc("/api/node-red/nodes/", s.handleNodeRedMetadata)
+	mux.HandleFunc("/api/node-red/locales/nodes", s.handleNodeRedMetadata)
+	mux.HandleFunc("/api/node-red/locales/", s.handleNodeRedMetadata)
 	return securityHeaders(mux)
 }
 
@@ -509,6 +513,79 @@ func (s *server) handleFlows(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(responseBody)
 }
 
+// handleNodeRedMetadata exposes only the read-only editor metadata endpoints
+// that the mobile client needs. Keeping the path allowlist here avoids turning
+// the gateway into a general-purpose proxy for the Node-RED admin API.
+func (s *server) handleNodeRedMetadata(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, http.MethodGet)
+		return
+	}
+	if _, ok := s.authorize(w, r); !ok {
+		return
+	}
+	path := strings.TrimPrefix(r.URL.Path, "/api/node-red")
+	if !allowedNodeRedMetadataPath(path) {
+		http.NotFound(w, r)
+		return
+	}
+	allowed := make(http.Header)
+	for _, name := range []string{"Accept", "Accept-Language"} {
+		if value := r.Header.Get(name); value != "" {
+			allowed.Set(name, value)
+		}
+	}
+	response, err := s.nodeRedRequestPath(r.Context(), http.MethodGet, path, allowed, nil)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "Could not reach Node-RED")
+		return
+	}
+	defer response.Body.Close()
+	responseBody, err := io.ReadAll(io.LimitReader(response.Body, maxRequestBytes+1))
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "Could not read the Node-RED response")
+		return
+	}
+	if int64(len(responseBody)) > maxRequestBytes {
+		writeError(w, http.StatusBadGateway, "Node-RED response is too large")
+		return
+	}
+	for _, name := range []string{"Content-Type", "ETag", "Node-RED-API-Version"} {
+		if value := response.Header.Get(name); value != "" {
+			w.Header().Set(name, value)
+		}
+	}
+	w.WriteHeader(response.StatusCode)
+	_, _ = w.Write(responseBody)
+}
+
+func allowedNodeRedMetadataPath(path string) bool {
+	if path == "/nodes" || path == "/locales/nodes" {
+		return true
+	}
+	if strings.HasPrefix(path, "/nodes/") {
+		parts := strings.Split(strings.TrimPrefix(path, "/nodes/"), "/")
+		return validMetadataPathParts(parts, 2, 3)
+	}
+	if strings.HasPrefix(path, "/locales/") {
+		parts := strings.Split(strings.TrimPrefix(path, "/locales/"), "/")
+		return validMetadataPathParts(parts, 1, 2)
+	}
+	return false
+}
+
+func validMetadataPathParts(parts []string, minimum, maximum int) bool {
+	if len(parts) < minimum || len(parts) > maximum {
+		return false
+	}
+	for _, part := range parts {
+		if part == "" || part == "." || part == ".." || strings.ContainsAny(part, "?#\\") {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *server) authorize(w http.ResponseWriter, r *http.Request) (device, bool) {
 	value := strings.TrimSpace(r.Header.Get("Authorization"))
 	if !strings.HasPrefix(value, "Bearer ") || len(value) <= len("Bearer ") {
@@ -636,15 +713,19 @@ func samePairingFile(a, b pairingFile) bool {
 }
 
 func (s *server) nodeRedRequest(ctx context.Context, method string, headers http.Header, body []byte) (*http.Response, error) {
-	response, err := s.doNodeRed(ctx, method, headers, body, false)
-	if err != nil || s.cfg.nodeRedAuthMode != "admin" || response.StatusCode != http.StatusUnauthorized || s.cfg.nodeRedUsername == "" {
+	return s.nodeRedRequestPath(ctx, method, "/flows", headers, body)
+}
+
+func (s *server) nodeRedRequestPath(ctx context.Context, method, path string, headers http.Header, body []byte) (*http.Response, error) {
+	response, err := s.doNodeRed(ctx, method, path, headers, body, false)
+	if err != nil || response == nil || s.cfg.nodeRedAuthMode != "admin" || response.StatusCode != http.StatusUnauthorized || s.cfg.nodeRedUsername == "" {
 		return response, err
 	}
 	response.Body.Close()
-	return s.doNodeRed(ctx, method, headers, body, true)
+	return s.doNodeRed(ctx, method, path, headers, body, true)
 }
 
-func (s *server) doNodeRed(ctx context.Context, method string, headers http.Header, body []byte, refresh bool) (*http.Response, error) {
+func (s *server) doNodeRed(ctx context.Context, method, path string, headers http.Header, body []byte, refresh bool) (*http.Response, error) {
 	token := ""
 	if s.cfg.nodeRedAuthMode == "admin" {
 		var err error
@@ -655,7 +736,7 @@ func (s *server) doNodeRed(ctx context.Context, method string, headers http.Head
 	}
 	target := *s.cfg.nodeRedURL
 	prefix := strings.TrimRight(target.Path, "/")
-	target.Path = prefix + "/flows"
+	target.Path = prefix + "/" + strings.TrimLeft(path, "/")
 	target.RawPath = ""
 	target.RawQuery = ""
 	target.Fragment = ""

@@ -41,6 +41,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
   List<List<FlowNode>> _undoStack = [];
   List<List<FlowNode>> _redoStack = [];
   List<String> _recentTypes = [];
+  Map<String, Map<String, String>> _nodeFieldLabels = {};
 
   bool get _isDemo => widget.connection.id == 'demo';
   bool get _isDirty => _canonical(_nodes) != _canonical(_deployedNodes);
@@ -68,6 +69,9 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       tabs = _tabs;
     }
     _activeTabId = tabs.first['id'].toString();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadNodeFieldLabels();
+    });
   }
 
   @override
@@ -102,6 +106,25 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
   }
 
   String _canonical(List<FlowNode> nodes) => jsonEncode(nodes);
+
+  Future<void> _loadNodeFieldLabels([Iterable<String>? types]) async {
+    if (_isDemo) return;
+    final requested =
+        types ?? _nodes.map((node) => node['type']?.toString() ?? '');
+    try {
+      final labels = await _api.getNodeFieldLabels(
+        widget.connection,
+        requested,
+      );
+      if (!mounted || labels.isEmpty) return;
+      setState(() {
+        _nodeFieldLabels = {..._nodeFieldLabels, ...labels};
+      });
+    } catch (_) {
+      // Form metadata is an enhancement. The normal editor remains usable
+      // when an older Node-RED instance does not expose the editor endpoint.
+    }
+  }
 
   void _recordSnapshot() {
     _undoStack = [..._undoStack, cloneNodes(_nodes)];
@@ -367,6 +390,12 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
 
   Future<void> _editNode(String id) async {
     final original = _nodes.firstWhere((node) => node['id'].toString() == id);
+    final type = original['type']?.toString() ?? '';
+    if (!_isDemo && !_nodeFieldLabels.containsKey(type)) {
+      await _loadNodeFieldLabels([type])
+          .timeout(const Duration(seconds: 3), onTimeout: () {});
+    }
+    if (!mounted) return;
     final result = await showModalBottomSheet<FlowNode>(
       context: context,
       isScrollControlled: true,
@@ -374,7 +403,10 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => _NodeEditorSheet(initial: original),
+      builder: (_) => _NodeEditorSheet(
+        initial: original,
+        fieldLabels: _nodeFieldLabels[type] ?? const {},
+      ),
     );
     if (result != null) {
       if (result['__delete'] == true) {
@@ -1474,8 +1506,9 @@ class _NodePickerSheetState extends State<_NodePickerSheet> {
 }
 
 class _NodeEditorSheet extends StatefulWidget {
-  const _NodeEditorSheet({required this.initial});
+  const _NodeEditorSheet({required this.initial, this.fieldLabels = const {}});
   final FlowNode initial;
+  final Map<String, String> fieldLabels;
 
   @override
   State<_NodeEditorSheet> createState() => _NodeEditorSheetState();
@@ -1679,7 +1712,6 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
                             onChanged: (next) =>
                                 setState(() => _draft[field] = next),
                             title: Text(_humanize(field)),
-                            subtitle: Text(field),
                           ),
                         );
                       }
@@ -1693,8 +1725,6 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
                           decoration: InputDecoration(
                             labelText: _humanize(field),
                             prefixIcon: Icon(_fieldIcon(field)),
-                            helperText: field,
-                            helperMaxLines: 1,
                           ),
                         ),
                       );
@@ -1718,7 +1748,7 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
                         child: _EditorActionTile(
                           icon: Icons.data_object_rounded,
                           title: '编辑 ${_humanize(field)}',
-                          subtitle: _previewJson(_draft[field]),
+                          subtitle: _structuredSummary(_draft[field]),
                           onTap: () => _editStructuredField(field),
                         ),
                       ),
@@ -1760,42 +1790,54 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
     return TextInputType.text;
   }
 
-  String _humanize(String value) => switch (value) {
-    'topic' => '主题',
-    'payload' => '消息内容',
-    'repeat' => '重复间隔（秒）',
-    'outputs' => '输出数量',
-    'property' => '消息属性',
-    'timeout' => '延迟时长',
-    'timeoutUnits' => '时间单位',
-    'field' => '写入字段',
-    'method' => '请求方法',
-    'url' => '请求地址',
-    'qos' => 'QoS',
-    'entityId' || 'entity_id' => '实体',
-    'entityidfilter' || 'entity_id_filter' => '实体筛选',
-    'server' => '服务器',
-    'domain' => '域',
-    'service' => '服务',
-    'service_domain' => '服务域',
-    'action' => '动作',
-    'dataType' => '数据类型',
-    'halt_if' => '停止条件',
-    'halt_if_type' => '条件类型',
-    'halt_if_compare' => '比较方式',
-    'outputInitially' => '初始输出',
-    'stateType' => '状态类型',
-    'for' => '持续时间',
-    'forType' => '持续时间类型',
-    'forUnits' => '时间单位',
-    _ =>
-      value
-          .replaceAllMapped(
-            RegExp(r'([a-z0-9])([A-Z])'),
-            (match) => '${match.group(1)} ${match.group(2)}',
-          )
-          .replaceAll(RegExp(r'[_-]+'), ' '),
-  };
+  String _humanize(String value) {
+    final provided = widget.fieldLabels[value]?.trim();
+    if (provided != null && provided.isNotEmpty) return provided;
+    return switch (value) {
+      'name' => '名称',
+      'topic' => '主题',
+      'payload' => '消息内容',
+      'repeat' => '重复间隔（秒）',
+      'outputs' => '输出数量',
+      'property' => '消息属性',
+      'timeout' => '延迟时长',
+      'timeoutUnits' => '时间单位',
+      'field' => '写入字段',
+      'method' => '请求方法',
+      'url' => '请求地址',
+      'qos' => 'QoS',
+      'entityId' || 'entity_id' => '实体',
+      'entityidfilter' || 'entity_id_filter' => '实体筛选',
+      'server' => '服务器',
+      'domain' => '域',
+      'service' => '服务',
+      'service_domain' => '服务域',
+      'action' => '动作',
+      'dataType' => '数据类型',
+      'halt_if' => '停止条件',
+      'halt_if_type' => '条件类型',
+      'halt_if_compare' => '比较方式',
+      'outputInitially' => '初始输出',
+      'stateType' => '状态类型',
+      'for' => '持续时间',
+      'forType' => '持续时间类型',
+      'forUnits' => '时间单位',
+      _ =>
+        value
+            .replaceAllMapped(
+              RegExp(r'([a-z0-9])([A-Z])'),
+              (match) => '${match.group(1)} ${match.group(2)}',
+            )
+            .replaceAll(RegExp(r'[_-]+'), ' '),
+    };
+  }
+
+  String _structuredSummary(dynamic value) {
+    if (value == null) return '未设置 · 点击编辑';
+    if (value is Map) return '${value.length} 项配置 · 点击编辑';
+    if (value is List) return '${value.length} 项 · 点击编辑';
+    return '已配置 · 点击编辑';
+  }
 
   IconData _fieldIcon(String key) => switch (key) {
     'url' => Icons.link_rounded,
@@ -2165,9 +2207,4 @@ String _preview(String value) {
   final compact = value.trim().replaceAll('\n', ' ');
   if (compact.isEmpty) return '未设置';
   return compact.length > 68 ? '${compact.substring(0, 68)}…' : compact;
-}
-
-String _previewJson(dynamic value) {
-  final text = value == null ? 'null' : jsonEncode(value);
-  return _preview(text);
 }
