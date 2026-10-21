@@ -12,4 +12,5 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 
 - The selected visual direction is the first warm paper and wine/coral Flow concept, with the final dark Debug chapter blended in for contrast.
 - Use simulator or native desktop captures for product imagery. Never use the user's physical iPhone for screenshots.
+- Product screenshots should use the portrait iPhone simulator capture inside a generated iPhone shell mockup; do not display the old landscape capture in the marketing page.
 - The three download URLs live in src/download-links.js; keep the controls disabled until real Google Play, Pgyer, and iOS URLs are supplied.

@@ -13,7 +13,7 @@
 
 - Full-view desktop capture: hero composition, marquee, complex Flow story, native Home Assistant form, dark Debug chapter, private Gateway chapter, and download section were inspected while scrolling through the local page.
 - Focused hero comparison: the implementation keeps the source's warm paper field, wine/coral ribbon, phone canvas, soft shadows, and spacious editorial hierarchy. The generated hero is used as a real cropped asset at `public/assets/flow-hero.png`; live HTML copy replaces the source's English headline so the page can switch between Chinese and English.
-- Focused product evidence: `public/assets/rivlen-app-preview.png` is a simulator capture, not a physical iPhone capture. The Home Assistant form, Debug console, gateway rings, and download controls were inspected at both desktop and 390 px layouts.
+- Focused product evidence: `public/app-shots/rivlen-iphone17pro.png` is a portrait iPhone 17 Pro simulator capture, and `public/assets/rivlen-iphone-mockup.png` is its generated front-facing shell mockup. No physical iPhone was used. The Node-RED node rail, Home Assistant form, Debug console, gateway rings, and download controls were inspected at both desktop and 390 px layouts.
 - Primary interactions checked: nav anchors, CTA scroll, light/dark toggle, Chinese/English toggle, responsive stacking, disabled download states, and mobile language button accessibility label.
 - Console evidence: a fresh browser tab at the implementation URL reported no warning or error logs after load.
 
@@ -32,13 +32,17 @@ No actionable P0, P1, or P2 differences remain.
 4. Initial mobile pass: the compact language control had no accessible name because its visible label is hidden at the small breakpoint. Severity P2.
 5. Fix: added a localized `aria-label` to the language toggle.
 6. Post-fix pass: the mobile accessibility tree exposes `English` / `中文`, and the toggle changes the page title and copy correctly.
+7. Initial product image pass: the displayed simulator capture was landscape and made the phone proportions read incorrectly on the page. Severity P2.
+8. Fix: captured the running app in the iPhone 17 Pro simulator, generated a transparent iPhone shell around the portrait capture, and replaced the displayed asset with the portrait mockup. Added an explicit Node-RED node showcase and shortened the supporting copy to design concepts.
+9. Post-fix pass: the page uses the portrait shell mockup at desktop and mobile widths; no P0/P1/P2 findings remain.
 
 ## Implementation checklist
 
 - [x] Warm paper, wine, coral, and soft-shadow visual tokens map to the selected direction.
 - [x] GSAP entrance, parallax, reveal, progress-line, and Debug pulse interactions are responsive and reduced-motion aware.
 - [x] Desktop pinned storytelling layout collapses into a readable mobile stack.
-- [x] Simulator product capture and generated ambient Debug artwork are real image assets.
+- [x] Portrait simulator product capture and generated iPhone shell artwork are real image assets.
+- [x] Node-RED nodes are shown directly as a visual section rather than only described in copy.
 - [x] Phosphor icon library is used for interface icons.
 - [x] Build and Sites packaging tests pass.
 - [ ] Add the three real download URLs.

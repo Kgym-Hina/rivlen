@@ -32,44 +32,51 @@ const copy = {
     hero: {
       eyebrow: '移动端 Node-RED Flow 编辑器',
       title: '把 Flow，装进口袋。',
-      body: '在熟悉的 Node-RED 逻辑里，拖动、编辑、部署，随时随地把自动化带在身边。',
+      body: '拖动节点，连接逻辑，随时调试。',
       cta: '开始探索',
-      note: '为真实运行环境而设计',
+      note: '为真实 Flow 设计',
+    },
+    nodes: {
+      eyebrow: '01 / 节点就是语言',
+      title: '节点，直接可见。',
+      body: 'Inject、Function、Home Assistant、Debug：把逻辑放回画布。',
+      labels: ['Inject', 'Function', 'Home Assistant', 'Debug'],
+      captions: ['触发', '处理', '设备动作', '实时消息'],
     },
     story: {
-      eyebrow: '01 / 从复杂开始',
-      title: '复杂的 Flow，\n也可以轻盈。',
-      body: '桌面端的坐标和信息密度，不应该成为移动端的负担。Rivlen 会把原本的 Flow 保留下来，再为手指重新安排距离、层级和节奏。',
-      small: '同一份逻辑，更自然的触摸。',
-      tags: ['缩放坐标', '自动排开', '保留原始字段'],
+      eyebrow: '02 / 从复杂开始',
+      title: '复杂 Flow，\n轻一点。',
+      body: '同一份 Flow，按手机屏幕重新排开。',
+      small: '保留逻辑，减少拥挤。',
+      tags: ['缩放坐标', '自动排开', '字段保留'],
     },
     ha: {
-      eyebrow: '02 / 原生编辑',
+      eyebrow: '03 / 原生编辑',
       title: '不是 JSON 编辑器。',
-      body: 'Home Assistant 节点里的服务、设备、实体和动作，都从你的 Node-RED 实例直接加载，按照网页版顺序呈现为可选择的表单。',
+      body: '服务、设备、实体和动作，按网页版顺序直接选择。',
       labels: ['服务', '实体', '动作'],
       values: ['灯光 · 客厅', 'light.living_room', '打开'],
-      note: '字段标题、顺序和本地化文字，跟着你的实例走。',
+      note: '原生表单，不是 JSON。',
     },
     debug: {
-      eyebrow: '03 / Debug 在场',
+      eyebrow: '04 / Debug 在场',
       title: '消息出现时，\n你会看见它。',
-      body: 'Debug 节点会短暂发光，底部入口留下通知点。点击一下，就从画布跳到实时消息。',
+      body: 'Debug 节点亮起，消息随手可见。',
       pulse: 'NEW MESSAGE',
       log: ['msg.payload  82.4', 'msg.topic    living_room', 'node         debug'],
       note: '收到消息 · 22:14:07',
     },
     gateway: {
-      eyebrow: '04 / 私有连接',
+      eyebrow: '05 / 私有连接',
       title: '你的 Flow，\n只经过你的网关。',
-      body: '通过 Rivlen Gateway 连接已有 Node-RED 实例。手机负责编辑和观察，运行环境仍然留在你的局域网里。',
-      points: ['扫码配对', '设备可撤销', '不运行第二套引擎'],
+      body: '手机连接你的 Node-RED，运行仍在局域网。',
+      points: ['扫码配对', '可撤销设备', '不重复运行'],
       cta: '了解连接方式',
     },
     download: {
-      eyebrow: '05 / 带走 Rivlen',
+      eyebrow: '06 / 带走 Rivlen',
       title: '把自动化，\n带到现场。',
-      body: '选择你的平台。下载入口集中配置，链接更新后页面会自动同步。',
+      body: '选择平台，带走你的 Flow。',
       unavailable: '链接待配置',
       play: 'Google Play',
       pgyer: '蒲公英测试版',
@@ -84,44 +91,51 @@ const copy = {
     hero: {
       eyebrow: 'Mobile Node-RED Flow editor',
       title: 'Flows in your hands.',
-      body: 'Pan, edit, deploy, and debug the Node-RED flows you already run — wherever the work takes you.',
+      body: 'Drag nodes, connect logic, debug anywhere.',
       cta: 'Explore the story',
-      note: 'Built for real running systems',
+      note: 'Built for real Flows',
+    },
+    nodes: {
+      eyebrow: '01 / Nodes are the language',
+      title: 'See the nodes at work.',
+      body: 'Inject, Function, Home Assistant, and Debug stay visible on the canvas.',
+      labels: ['Inject', 'Function', 'Home Assistant', 'Debug'],
+      captions: ['Trigger', 'Transform', 'Device action', 'Live message'],
     },
     story: {
-      eyebrow: '01 / Start with complexity',
-      title: 'Complex flows,\nmade lighter.',
-      body: 'Desktop coordinates and information density should not become a mobile burden. Rivlen keeps the original Flow while rearranging space, hierarchy, and rhythm for touch.',
-      small: 'The same logic, a more natural touch.',
-      tags: ['Scaled coordinates', 'Auto spacing', 'Unknown fields kept'],
+      eyebrow: '02 / Start with complexity',
+      title: 'Complex flows,\nmade light.',
+      body: 'The same Flow, re-spaced for touch.',
+      small: 'Keep the logic. Lose the crowding.',
+      tags: ['Scaled coordinates', 'Auto spacing', 'Fields kept'],
     },
     ha: {
-      eyebrow: '02 / Native editing',
+      eyebrow: '03 / Native editing',
       title: 'Not a JSON editor.',
-      body: 'Services, devices, entities, and actions in Home Assistant nodes load directly from your Node-RED instance and appear as ordered, selectable forms.',
+      body: 'Choose services, devices, entities, and actions in order.',
       labels: ['Service', 'Entity', 'Action'],
       values: ['Light · Living room', 'light.living_room', 'Turn on'],
-      note: 'Labels, order, and local language follow your instance.',
+      note: 'Native forms, not JSON.',
     },
     debug: {
-      eyebrow: '03 / Debug, in the room',
+      eyebrow: '04 / Debug, in the room',
       title: 'When a message arrives,\nyou see it.',
-      body: 'The Debug node briefly lights up. A notification dot stays in the bottom bar. One tap opens the live message stream.',
+      body: 'The Debug node lights up. Messages stay close.',
       pulse: 'NEW MESSAGE',
       log: ['msg.payload  82.4', 'msg.topic    living_room', 'node         debug'],
       note: 'Message received · 22:14:07',
     },
     gateway: {
-      eyebrow: '04 / Private connection',
+      eyebrow: '05 / Private connection',
       title: 'Your Flow,\nthrough your gateway.',
-      body: 'Connect to an existing Node-RED instance through Rivlen Gateway. The phone edits and observes while the runtime stays inside your network.',
-      points: ['Pair by QR', 'Revoke devices', 'No second engine'],
+      body: 'Connect your Node-RED from the phone. Runtime stays local.',
+      points: ['Pair by QR', 'Revoke devices', 'No duplicate runtime'],
       cta: 'See how it connects',
     },
     download: {
-      eyebrow: '05 / Take Rivlen with you',
+      eyebrow: '06 / Take Rivlen with you',
       title: 'Bring automation\nto the field.',
-      body: 'Choose your platform. Download links live in one place so the page stays easy to update.',
+      body: 'Choose a platform. Take your Flow with you.',
       unavailable: 'Link to be configured',
       play: 'Google Play',
       pgyer: 'Pgyer beta',
@@ -137,6 +151,7 @@ function App() {
   const [language, setLanguage] = useState('zh');
   const [darkMode, setDarkMode] = useState(false);
   const t = useMemo(() => copy[language], [language]);
+  const nodeGlyphs = [FlowArrow, SlidersHorizontal, Broadcast, Bug];
 
   useEffect(() => {
     document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
@@ -188,7 +203,9 @@ function App() {
 
         <section className="marquee-band" aria-label="Rivlen principles"><div className="marquee-track"><span>Pan</span><i /><span>Connect</span><i /><span>Edit</span><i /><span>Deploy</span><i /><span>Debug</span><i /><span>Pan</span><i /><span>Connect</span><i /></div></section>
 
-        <section id="experience" className="story-track section-shell"><div className="story-intro reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.story.eyebrow}</div><h2>{t.story.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.story.body}</p><div className="story-small"><FlowArrow size={18} />{t.story.small}</div><div className="tag-row">{t.story.tags.map((tag) => <span key={tag}>{tag}</span>)}</div></div><div className="story-stage"><div className="story-line" aria-hidden="true"><span className="story-line-progress" /></div><div className="story-image reveal"><img src="/assets/rivlen-app-preview.png" alt="Rivlen connection screen running in an iOS simulator" /><div className="image-label"><span>01</span><span>{language === 'zh' ? '连接你的实例' : 'Connect your instance'}</span></div></div></div></section>
+        <section className="node-showcase section-shell"><div className="node-showcase-copy reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.nodes.eyebrow}</div><h2>{t.nodes.title}</h2><p>{t.nodes.body}</p></div><div className="node-rail reveal" aria-label={language === 'zh' ? 'Node-RED 节点示例' : 'Node-RED node examples'}>{t.nodes.labels.map((label, index) => { const Icon = nodeGlyphs[index]; return <div className={`node-card node-card-${index}`} key={label}><span className="node-port node-port-in" aria-hidden="true" /><span className="node-card-icon"><Icon size={19} weight="bold" /></span><span className="node-card-copy"><strong>{label}</strong><small>{t.nodes.captions[index]}</small></span><span className="node-port node-port-out" aria-hidden="true" /></div>; })}</div></section>
+
+        <section id="experience" className="story-track section-shell"><div className="story-intro reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.story.eyebrow}</div><h2>{t.story.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.story.body}</p><div className="story-small"><FlowArrow size={18} />{t.story.small}</div><div className="tag-row">{t.story.tags.map((tag) => <span key={tag}>{tag}</span>)}</div></div><div className="story-stage"><div className="story-line" aria-hidden="true"><span className="story-line-progress" /></div><div className="story-image reveal"><img src="/assets/rivlen-iphone-mockup.png" alt="Rivlen running inside an iPhone simulator mockup" /><div className="image-label"><span>02</span><span>{language === 'zh' ? '连接你的实例' : 'Connect your instance'}</span></div></div></div></section>
 
         <section id="features" className="ha-section section-shell"><div className="ha-copy reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.ha.eyebrow}</div><h2>{t.ha.title}</h2><p>{t.ha.body}</p><div className="ha-note"><Check size={16} weight="bold" />{t.ha.note}</div></div><div className="form-stage reveal"><div className="form-window-top"><span>Home Assistant</span><span className="window-dots"><i /><i /><i /></span></div><div className="form-heading"><span>{language === 'zh' ? '编辑节点' : 'Edit node'}</span><SlidersHorizontal size={18} /></div><div className="form-list">{t.ha.labels.map((label, index) => <label key={label}><span>{label}</span><div className="select-field"><span>{t.ha.values[index]}</span><CaretDown size={15} /></div></label>)}</div><div className="form-foot"><span className="form-status" />{language === 'zh' ? '从实例加载' : 'Loaded from instance'}<ArrowUpRight size={15} /></div></div></section>
 
