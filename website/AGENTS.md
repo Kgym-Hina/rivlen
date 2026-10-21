@@ -16,3 +16,5 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - The three download URLs live in src/download-links.js; keep the controls disabled until real Google Play, Pgyer, and iOS URLs are supplied.
 
 - Use scroll-driven pinned scenes for the node canvas: draw connections, send messages along wires, and reveal Debug feedback. Keep marketing copy short.
+
+- Device actions should have visible physical feedback (light glow, dimmer, fan, temperature) synchronized to the scroll timeline. Use native sticky chapters with stable svh heights; avoid ScrollTrigger pin spacers and scroll distances based on changing mobile innerHeight.

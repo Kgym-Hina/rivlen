@@ -15,6 +15,9 @@ import {
   GlobeHemisphereWest,
   GooglePlayLogo,
   LockKey,
+  Lightbulb,
+  Fan,
+  Thermometer,
   Moon,
   QrCode,
   SlidersHorizontal,
@@ -25,6 +28,8 @@ import {
 import { downloadLinks } from './download-links.js';
 
 gsap.registerPlugin(ScrollTrigger);
+// Mobile browser chrome must not rebuild scroll distances during a gesture.
+ScrollTrigger.config({ ignoreMobileResize: true });
 
 const copy = {
   zh: {
@@ -38,39 +43,39 @@ const copy = {
     },
     nodes: {
       eyebrow: '01 / 节点就是语言',
-      title: '节点，直接可见。',
+      title: '连起来，就发生。',
       body: 'Inject、Function、Home Assistant、Debug：把逻辑放回画布。',
       labels: ['Inject', 'Function', 'Home Assistant', 'Debug'],
       captions: ['触发', '处理', '设备动作', '实时消息'],
-      steps: ['连接节点', '让消息流动', '看见每次响应'],
+      steps: ['连接', '传递', '灯亮了'],
     },
     story: {
       eyebrow: '02 / 从复杂开始',
       title: '复杂 Flow，\n轻一点。',
-      body: '同一份 Flow，按手机屏幕重新排开。',
-      small: '保留逻辑，减少拥挤。',
+      body: '为手指，留出空间。',
+      small: '逻辑如旧，触摸更轻。',
       tags: ['缩放坐标', '自动排开', '字段保留'],
     },
     ha: {
       eyebrow: '03 / 原生编辑',
-      title: '不是 JSON 编辑器。',
-      body: '服务、设备、实体和动作，按网页版顺序直接选择。',
+      title: '让家，回应。',
+      body: '选设备，定动作。',
       labels: ['服务', '实体', '动作'],
       values: ['灯光 · 客厅', 'light.living_room', '打开'],
-      note: '原生表单，不是 JSON。',
+      note: '来自你的实例',
     },
     debug: {
       eyebrow: '04 / Debug 在场',
-      title: '消息出现时，\n你会看见它。',
-      body: 'Debug 节点亮起，消息随手可见。',
+      title: '回应，\n即刻看见。',
+      body: '每条消息，都有回响。',
       pulse: 'NEW MESSAGE',
-      log: ['msg.payload  82.4', 'msg.topic    living_room', 'node         debug'],
+      log: ['msg.payload  on', 'msg.topic    living_room', 'node         debug'],
       note: '收到消息 · 22:14:07',
     },
     gateway: {
       eyebrow: '05 / 私有连接',
-      title: '你的 Flow，\n只经过你的网关。',
-      body: '手机连接你的 Node-RED，运行仍在局域网。',
+      title: '连接，\n由你掌控。',
+      body: '编辑在手边，运行在本地。',
       points: ['扫码配对', '可撤销设备', '不重复运行'],
       cta: '了解连接方式',
     },
@@ -98,39 +103,39 @@ const copy = {
     },
     nodes: {
       eyebrow: '01 / Nodes are the language',
-      title: 'See the nodes at work.',
+      title: 'Connect. Make it happen.',
       body: 'Inject, Function, Home Assistant, and Debug stay visible on the canvas.',
       labels: ['Inject', 'Function', 'Home Assistant', 'Debug'],
       captions: ['Trigger', 'Transform', 'Device action', 'Live message'],
-      steps: ['Connect the nodes', 'Follow the message', 'See every response'],
+      steps: ['Connect', 'Send', 'Lights on'],
     },
     story: {
       eyebrow: '02 / Start with complexity',
       title: 'Complex flows,\nmade light.',
-      body: 'The same Flow, re-spaced for touch.',
-      small: 'Keep the logic. Lose the crowding.',
+      body: 'Room for your fingers.',
+      small: 'Familiar logic. Lighter touch.',
       tags: ['Scaled coordinates', 'Auto spacing', 'Fields kept'],
     },
     ha: {
       eyebrow: '03 / Native editing',
-      title: 'Not a JSON editor.',
-      body: 'Choose services, devices, entities, and actions in order.',
+      title: 'Bring it to life.',
+      body: 'Choose a device. Set an action.',
       labels: ['Service', 'Entity', 'Action'],
       values: ['Light · Living room', 'light.living_room', 'Turn on'],
-      note: 'Native forms, not JSON.',
+      note: 'From your instance',
     },
     debug: {
       eyebrow: '04 / Debug, in the room',
-      title: 'When a message arrives,\nyou see it.',
-      body: 'The Debug node lights up. Messages stay close.',
+      title: 'See every\nresponse.',
+      body: 'Every message, in sight.',
       pulse: 'NEW MESSAGE',
-      log: ['msg.payload  82.4', 'msg.topic    living_room', 'node         debug'],
+      log: ['msg.payload  on', 'msg.topic    living_room', 'node         debug'],
       note: 'Message received · 22:14:07',
     },
     gateway: {
       eyebrow: '05 / Private connection',
-      title: 'Your Flow,\nthrough your gateway.',
-      body: 'Connect your Node-RED from the phone. Runtime stays local.',
+      title: 'Your connection.\nYour control.',
+      body: 'Edit anywhere. Run locally.',
       points: ['Pair by QR', 'Revoke devices', 'No duplicate runtime'],
       cta: 'See how it connects',
     },
@@ -189,7 +194,11 @@ function App() {
       gsap.from('.hero-art', { x: 60, y: 24, rotate: 2, autoAlpha: 0, duration: 1.2, delay: 0.35, ease: 'power3.out' });
       gsap.to('.hero-art', { yPercent: -10, rotate: -1, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true } });
       gsap.utils.toArray('.reveal').forEach((element) => gsap.from(element, { y: 36, autoAlpha: 0, duration: 0.9, ease: 'power3.out', scrollTrigger: { trigger: element, start: 'top 82%', once: true } }));
-      // One pinned canvas: connect, send a message, then reveal the result.
+      // Native sticky layout keeps the document geometry identical at both boundaries.
+      const chapterDistance = (selector) => {
+        const chapter = document.querySelector(selector);
+        return Math.max(1, chapter.offsetHeight - chapter.firstElementChild.offsetHeight);
+      };
       const rail = document.querySelector('.node-rail');
       const cards = gsap.utils.toArray('.node-card');
       const paths = gsap.utils.toArray('.flow-wire');
@@ -218,8 +227,8 @@ function App() {
       gsap.set('.flow-caption-0', { autoAlpha: 1, y: 0 });
       gsap.set('.flow-packet, .flow-result, .node-notification', { autoAlpha: 0 });
       const flow = gsap.timeline({ scrollTrigger: {
-        trigger: '.node-showcase', start: 'top top', end: () => `+=${window.innerHeight * 2.5}`,
-        pin: true, scrub: 0.65, anticipatePin: 1, invalidateOnRefresh: true,
+        trigger: '.node-chapter', start: 'top top', end: () => `+=${chapterDistance('.node-chapter')}`,
+        scrub: 0.65, invalidateOnRefresh: true,
         onRefreshInit: measureWires,
       } });
       flow.from(cards, { opacity: 0.35, stagger: 0.1, duration: 0.6 })
@@ -239,25 +248,35 @@ function App() {
           .to(cards[index + 1], { borderColor: '#ea725f', boxShadow: '0 0 35px rgba(234,114,95,.25)', duration: 0.2 }, 3 + index * 0.5)
           .to(cards[index + 1], { borderColor: '', boxShadow: '', duration: 0.35 }, 3.2 + index * 0.5);
       });
+      flow.to('.flow-device-glow', { opacity: 1, scale: 1, duration: 0.4 }, 3.5)
+        .to('.flow-device-icon', { color: '#d99b2e', duration: 0.3 }, 3.5);
       flow.to('.flow-caption-1', { autoAlpha: 0, y: -10, duration: 0.2 }, 4.1)
         .to('.flow-caption-2', { autoAlpha: 1, y: 0, duration: 0.2 }, 4.3)
         .to('.node-notification', { autoAlpha: 1, scale: 1.15, duration: 0.2 }, 4.1)
         .fromTo('.flow-result', { y: 16 }, { y: 0, autoAlpha: 1, duration: 0.4 }, 4.3)
         .to({}, { duration: 0.6 });
       gsap.to('.flow-progress span', { scaleX: 1, ease: 'none', scrollTrigger: {
-        trigger: '.node-showcase', start: 'top top', end: () => `+=${window.innerHeight * 2.5}`, scrub: true,
+        trigger: '.node-chapter', start: 'top top', end: () => `+=${chapterDistance('.node-chapter')}`, scrub: true,
       } });
+      gsap.set('.flow-device-glow', { opacity: 0, scale: 0.65 });
+      gsap.set('.room-response', { '--light-level': 0 });
       const form = gsap.timeline({ scrollTrigger: {
-        trigger: '.ha-section', start: 'top top', end: () => `+=${window.innerHeight * 0.9}`,
-        pin: true, scrub: 0.6, anticipatePin: 1,
+        trigger: '.ha-chapter', start: 'top top', end: () => `+=${chapterDistance('.ha-chapter')}`,
+        scrub: 0.6,
       } });
       form.from('.form-stage', { rotate: 4, scale: 0.92, duration: 0.7 })
         .from('.form-list label', { x: 35, opacity: 0, stagger: 0.4, duration: 0.5 }, 0.25)
         .from('.form-foot', { opacity: 0, y: 10, duration: 0.3 })
         .to('.select-field', { borderColor: '#ea725f', stagger: 0.16, duration: 0.2 })
-        .to('.select-field', { borderColor: '', duration: 0.3 });
-      gsap.timeline({ scrollTrigger: { trigger: '.debug-section', start: 'top top',
-        end: () => `+=${window.innerHeight * 0.85}`, pin: true, scrub: 0.6, anticipatePin: 1 } })
+        .to('.select-field', { borderColor: '', duration: 0.3 })
+        .to('.room-response', { '--light-level': 1, duration: 0.7 }, '>-0.2')
+        .to('.room-bulb', { color: '#d99b2e', duration: 0.5 }, '<')
+        .fromTo('.room-dimmer span', { scaleX: 0 }, { scaleX: 0.82, duration: 0.7 }, '<')
+        .fromTo('.room-fan svg', { rotation: 0 }, { rotation: 540, duration: 1.3, ease: 'power1.inOut' }, '<')
+        .fromTo('.room-temperature-value', { textContent: 26 }, { textContent: 22, snap: { textContent: 1 }, duration: 1.1 }, '<')
+        .to({}, { duration: 0.3 });
+      gsap.timeline({ scrollTrigger: { trigger: '.debug-chapter', start: 'top top',
+        end: () => `+=${chapterDistance('.debug-chapter')}`, scrub: 0.6 } })
         .from('.debug-console', { y: 50, rotateX: 12, scale: 0.94, duration: 0.6 })
         .from('.console-lines code', { y: 20, opacity: 0, stagger: 0.4, duration: 0.5 }, 0.3)
         .from('.console-foot', { opacity: 0, duration: 0.3 })
@@ -297,19 +316,19 @@ function App() {
       <main id="top">
         <section className="hero section-shell">
           <div className="hero-copy"><div className="eyebrow"><span className="eyebrow-dot" />{t.hero.eyebrow}</div><h1>{t.hero.title}</h1><p className="hero-body">{t.hero.body}</p><div className="hero-actions"><button className="button button-primary" type="button" onClick={() => scrollTo('experience')}>{t.hero.cta}<ArrowRight size={18} weight="bold" /></button><span className="hero-note"><Sparkle size={15} weight="fill" />{t.hero.note}</span></div></div>
-          <div className="hero-art" aria-label="Rivlen flow editor preview"><img src="/assets/flow-hero.png" alt="A Node-RED flow arranged on a mobile canvas" /><div className="hero-art-caption"><span>Rivlen / 01</span><span>Flow editor</span></div></div>
+          <div className="hero-art" aria-label="Rivlen flow editor preview"><img src="/assets/flow-hero.png" width="900" height="1024" alt="A Node-RED flow arranged on a mobile canvas" /><div className="hero-art-caption"><span>Rivlen / 01</span><span>Flow editor</span></div></div>
           <div className="hero-scroll"><span>Scroll to move through the flow</span><ArrowDownRight size={16} /></div>
         </section>
 
         <section className="marquee-band" aria-label="Rivlen principles"><div className="marquee-track"><span>Pan</span><i /><span>Connect</span><i /><span>Edit</span><i /><span>Deploy</span><i /><span>Debug</span><i /><span>Pan</span><i /><span>Connect</span><i /></div></section>
 
-        <section className="node-showcase section-shell"><div className="node-showcase-copy"><div className="eyebrow"><span className="eyebrow-dot" />{t.nodes.eyebrow}</div><h2>{t.nodes.title}</h2><div className="flow-captions">{t.nodes.steps.map((step, index) => <p className={`flow-caption flow-caption-${index}`} key={step}>{step}</p>)}</div><div className="flow-progress" aria-hidden="true"><span /></div></div><div className="node-rail" aria-label={language === 'zh' ? 'Node-RED 节点连接动画' : 'Node-RED connection animation'}><svg className="flow-wires" aria-hidden="true">{[0, 1, 2].map((index) => <g key={index}><path className="flow-wire-track" /><path className={`flow-wire flow-wire-${index}`} pathLength="1" /><circle className={`flow-packet flow-packet-${index}`} r="5" /></g>)}</svg>{t.nodes.labels.map((label, index) => { const Icon = nodeGlyphs[index]; return <div className={`node-card node-card-${index}`} key={label}>{index !== 0 && <span className="node-port node-port-in" aria-hidden="true" />}<span className="node-card-icon"><Icon size={19} weight="bold" /></span><span className="node-card-copy"><strong>{label}</strong><small>{t.nodes.captions[index]}</small></span>{index !== 3 && <span className="node-port node-port-out" aria-hidden="true" />}{index === 3 && <span className="node-notification" aria-hidden="true" />}</div>; })}<div className="flow-result"><span className="form-status" /><code>msg.payload <b>82.4</b></code><Check size={16} /></div></div></section>
+        <div className="scroll-chapter node-chapter"><section className="node-showcase section-shell"><div className="node-showcase-copy"><div className="eyebrow"><span className="eyebrow-dot" />{t.nodes.eyebrow}</div><h2>{t.nodes.title}</h2><div className="flow-captions">{t.nodes.steps.map((step, index) => <p className={`flow-caption flow-caption-${index}`} key={step}>{step}</p>)}</div><div className="flow-progress" aria-hidden="true"><span /></div></div><div className="node-rail" aria-label={language === 'zh' ? 'Node-RED 节点连接动画' : 'Node-RED connection animation'}><svg className="flow-wires" aria-hidden="true">{[0, 1, 2].map((index) => <g key={index}><path className="flow-wire-track" /><path className={`flow-wire flow-wire-${index}`} pathLength="1" /><circle className={`flow-packet flow-packet-${index}`} r="5" /></g>)}</svg>{t.nodes.labels.map((label, index) => { const Icon = nodeGlyphs[index]; return <div className={`node-card node-card-${index}`} key={label}>{index !== 0 && <span className="node-port node-port-in" aria-hidden="true" />}<span className="node-card-icon"><Icon size={19} weight="bold" /></span><span className="node-card-copy"><strong>{label}</strong><small>{t.nodes.captions[index]}</small></span>{index !== 3 && <span className="node-port node-port-out" aria-hidden="true" />}{index === 3 && <span className="node-notification" aria-hidden="true" />}</div>; })}<div className="flow-device" aria-hidden="true"><span className="flow-device-glow" /><Lightbulb className="flow-device-icon" size={29} weight="fill" /><code>light.turn_on</code></div><div className="flow-result"><span className="form-status" /><code>msg.payload <b>on</b></code><Check size={16} /></div></div></section></div>
 
-        <section id="experience" className="story-track section-shell"><div className="story-intro reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.story.eyebrow}</div><h2>{t.story.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.story.body}</p><div className="story-small"><FlowArrow size={18} />{t.story.small}</div><div className="tag-row">{t.story.tags.map((tag) => <span key={tag}>{tag}</span>)}</div></div><div className="story-stage"><div className="story-line" aria-hidden="true"><span className="story-line-progress" /></div><div className="story-image reveal"><img src="/assets/rivlen-iphone-mockup.png" alt="Rivlen running inside an iPhone simulator mockup" /><div className="image-label"><span>02</span><span>{language === 'zh' ? '连接你的实例' : 'Connect your instance'}</span></div></div></div></section>
+        <section id="experience" className="story-track section-shell"><div className="story-intro reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.story.eyebrow}</div><h2>{t.story.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.story.body}</p><div className="story-small"><FlowArrow size={18} />{t.story.small}</div><div className="tag-row">{t.story.tags.map((tag) => <span key={tag}>{tag}</span>)}</div></div><div className="story-stage"><div className="story-line" aria-hidden="true"><span className="story-line-progress" /></div><div className="story-image reveal"><img src="/assets/rivlen-iphone-mockup.png" width="851" height="1849" alt="Rivlen running inside an iPhone simulator mockup" /><div className="image-label"><span>02</span><span>{language === 'zh' ? '连接你的实例' : 'Connect your instance'}</span></div></div></div></section>
 
-        <section id="features" className="ha-section section-shell"><div className="ha-copy reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.ha.eyebrow}</div><h2>{t.ha.title}</h2><p>{t.ha.body}</p><div className="ha-note"><Check size={16} weight="bold" />{t.ha.note}</div></div><div className="form-stage"><div className="form-window-top"><span>Home Assistant</span><span className="window-dots"><i /><i /><i /></span></div><div className="form-heading"><span>{language === 'zh' ? '编辑节点' : 'Edit node'}</span><SlidersHorizontal size={18} /></div><div className="form-list">{t.ha.labels.map((label, index) => <label key={label}><span>{label}</span><div className="select-field"><span>{t.ha.values[index]}</span><CaretDown size={15} /></div></label>)}</div><div className="form-foot"><span className="form-status" />{language === 'zh' ? '从实例加载' : 'Loaded from instance'}<ArrowUpRight size={15} /></div></div></section>
+        <div className="scroll-chapter ha-chapter" id="features"><section className="ha-section section-shell"><div className="ha-copy reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.ha.eyebrow}</div><h2>{t.ha.title}</h2><p>{t.ha.body}</p><RoomResponse language={language} /></div><div className="form-stage"><div className="form-window-top"><span>Home Assistant</span><span className="window-dots"><i /><i /><i /></span></div><div className="form-heading"><span>{language === 'zh' ? '编辑节点' : 'Edit node'}</span><SlidersHorizontal size={18} /></div><div className="form-list">{t.ha.labels.map((label, index) => <label key={label}><span>{label}</span><div className="select-field"><span>{t.ha.values[index]}</span><CaretDown size={15} /></div></label>)}</div><div className="form-foot"><span className="form-status" />{language === 'zh' ? '从实例加载' : 'Loaded from instance'}<ArrowUpRight size={15} /></div></div></section></div>
 
-        <section className="debug-section"><img className="debug-atmosphere" src="/assets/debug-atmosphere.png" alt="" aria-hidden="true" /><div className="debug-inner section-shell"><div className="debug-copy reveal"><div className="eyebrow eyebrow-light"><span className="eyebrow-dot" />{t.debug.eyebrow}</div><h2>{t.debug.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.debug.body}</p><div className="debug-message"><span className="debug-pulse" /><span>{t.debug.pulse}</span><ArrowUpRight size={16} /></div></div><div className="debug-console"><div className="console-header"><span><Bug size={18} weight="fill" />Debug</span><span className="console-live"><i />LIVE</span></div><div className="console-lines">{t.debug.log.map((line) => <code key={line}>{line}</code>)}</div><div className="console-foot"><Broadcast size={16} />{t.debug.note}</div></div></div></section>
+        <div className="scroll-chapter debug-chapter"><section className="debug-section"><img className="debug-atmosphere" src="/assets/debug-atmosphere.png" alt="" aria-hidden="true" /><div className="debug-inner section-shell"><div className="debug-copy reveal"><div className="eyebrow eyebrow-light"><span className="eyebrow-dot" />{t.debug.eyebrow}</div><h2>{t.debug.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.debug.body}</p><div className="debug-message"><span className="debug-pulse" /><span>{t.debug.pulse}</span><ArrowUpRight size={16} /></div></div><div className="debug-console"><div className="console-header"><span><Bug size={18} weight="fill" />Debug</span><span className="console-live"><i />LIVE</span></div><div className="console-lines">{t.debug.log.map((line) => <code key={line}>{line}</code>)}</div><div className="console-foot"><Broadcast size={16} />{t.debug.note}</div></div></div></section></div>
 
         <section className="gateway-section section-shell"><div className="gateway-art reveal"><div className="gateway-ring ring-one" /><div className="gateway-ring ring-two" /><div className="gateway-core"><QrCode size={54} weight="thin" /><span>Rivlen Gateway</span></div><div className="gateway-node node-a"><span />Node-RED</div><div className="gateway-node node-b"><LockKey size={15} />Private</div><div className="gateway-node node-c"><span />Phone</div></div><div className="gateway-copy reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.gateway.eyebrow}</div><h2>{t.gateway.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.gateway.body}</p><ul>{t.gateway.points.map((point) => <li key={point}><Check size={16} weight="bold" />{point}</li>)}</ul><button className="text-link" type="button" onClick={() => scrollTo('download')}>{t.gateway.cta}<ArrowRight size={17} /></button></div></section>
 
@@ -317,6 +336,13 @@ function App() {
       </main>
     </div>
   );
+}
+
+function RoomResponse({ language }) {
+  return <div className="room-response" aria-label={language === 'zh' ? '灯光、风扇和温度随动作响应' : 'Light, fan, and temperature respond to the action'}>
+    <div className="room-light"><span className="room-light-glow" /><Lightbulb className="room-bulb" size={44} weight="fill" /><span>{language === 'zh' ? '客厅' : 'Living room'}</span></div>
+    <div className="room-controls"><div className="room-dimmer"><Sun size={15} /><i><span /></i></div><div className="room-climate"><span className="room-fan"><Fan size={25} /></span><span><Thermometer size={18} /><b className="room-temperature-value">22</b>°</span></div></div>
+  </div>;
 }
 
 function DownloadButton({ icon, label, href, unavailable }) {

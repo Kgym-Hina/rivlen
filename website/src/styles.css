@@ -267,3 +267,61 @@ h2 { margin-top: 27px; color: var(--wine); font-size: clamp(42px, 5vw, 76px); li
 @media (max-width: 520px) {
   .node-showcase, .ha-section { padding-inline: 22px; }
 }
+
+/* Stable scroll chapters: no spacer insertion or fixed/relative handoff on mobile. */
+html { scroll-behavior: auto; }
+.scroll-chapter { --scene-height: max(100svh, 620px); position: relative; overflow-anchor: none; }
+.node-chapter { height: calc(var(--scene-height) * 3.5); }
+.ha-chapter { height: calc(var(--scene-height) * 2.35); }
+.debug-chapter { height: calc(var(--scene-height) * 1.85); background: #171112; }
+.scroll-chapter > section { position: sticky; top: 0; height: var(--scene-height); min-height: 0; }
+.debug-inner { height: var(--scene-height); min-height: 0; }
+.story-image img { height: auto; }
+.flow-device { position: absolute; left: 0; bottom: -8px; display: flex; align-items: center; gap: 8px; min-height: 40px; color: var(--muted); font-size: 10px; }
+.flow-device-icon { position: relative; z-index: 1; }
+.flow-device-glow { position: absolute; width: 80px; height: 80px; left: -26px; top: -20px; border-radius: 50%; background: radial-gradient(circle, rgba(255,201,94,.5), rgba(255,201,94,0) 70%); pointer-events: none; }
+.room-response { --light-level: 1; position: relative; display: flex; align-items: center; width: min(100%, 300px); min-height: 118px; margin-top: 28px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); overflow: hidden; }
+.room-light { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; width: 115px; align-self: stretch; color: var(--muted); }
+.room-light > span:last-child { position: relative; font-size: 10px; letter-spacing: .08em; }
+.room-light-glow { position: absolute; inset: -20px; opacity: var(--light-level); background: radial-gradient(ellipse at 50% 40%, rgba(255,202,94,.52), rgba(255,202,94,0) 70%); }
+.room-bulb { position: relative; }
+.room-controls { position: relative; flex: 1; display: grid; gap: 22px; padding: 20px 20px 20px 4px; color: var(--muted); }
+.room-dimmer { display: flex; align-items: center; gap: 10px; }
+.room-dimmer i { position: relative; width: 100%; height: 3px; border-radius: 5px; background: var(--line); }
+.room-dimmer i span { display: block; height: 100%; width: 100%; background: #d99b2e; transform-origin: left; transform: scaleX(.82); }
+.room-dimmer i span::after { content: ''; display: block; position: absolute; right: -3px; top: -2px; width: 7px; height: 7px; border-radius: 50%; background: #d99b2e; }
+.room-climate { display: flex; align-items: center; justify-content: space-between; }
+.room-climate > span:last-child { display: flex; align-items: center; font-size: 16px; gap: 2px; }
+.room-temperature-value { font-size: 20px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 24px; }
+.room-fan { display: flex; align-items: center; }
+@media (max-width: 900px) {
+  .scroll-chapter { --scene-height: max(100svh, 650px); }
+  .node-chapter { --scene-height: max(100svh, 600px); }
+  .ha-section { gap: 20px; }
+  .room-response { width: min(100%, 320px); min-height: 85px; margin-top: 17px; border-radius: 16px; }
+  .room-light { width: 110px; gap: 4px; }
+  .room-bulb { width: 33px; height: 33px; }
+  .room-controls { gap: 12px; padding-block: 12px; }
+  .ha-section .form-stage { padding: 15px; }
+  .ha-section .form-heading { margin-top: 15px; font-size: 18px; }
+  .ha-section .select-field { min-height: 40px; }
+  .ha-section .form-list { gap: 9px; margin-top: 15px; }
+  .ha-section .form-list label { gap: 6px; }
+  .ha-section .form-foot { margin-top: 15px; }
+}
+@media (max-width: 520px) {
+  .flow-device { font-size: 8px; gap: 3px; }
+  .flow-device-icon { width: 23px; }
+  .flow-result { gap: 6px; }
+  .flow-result b { padding-left: 6px; }
+  .ha-section h2 { font-size: 35px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-chapter { height: auto; }
+  .scroll-chapter > section { position: relative; height: auto; }
+  .debug-inner { height: auto; }
+  .room-bulb, .flow-device-icon { color: #d99b2e; }
+}
+@media (max-width: 900px) {
+  .ha-section .ha-copy { width: 100%; }
+}

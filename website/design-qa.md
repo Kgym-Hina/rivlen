@@ -25,6 +25,12 @@
 - Timelines use scrub so scrolling upward reverses the sequence. Reduced-motion preference renders static content without pinning.
 - Browser console: no errors or warnings during the scroll pass.
 
+## Device response and mobile stability pass
+
+- Added a bulb that lights when the flow reaches Home Assistant. The form sequence now drives a warm lamp glow, a brightness slider, fan rotation, and a 26° → 22° temperature change. Chinese and English headlines and descriptions were shortened.
+- Replaced all three ScrollTrigger pins with CSS sticky scenes inside preallocated chapters. Animation distances use chapter minus scene height, and stable `svh` dimensions replace changing `innerHeight` distances. Mobile toolbar height-only resize refreshes are ignored; product images declare intrinsic dimensions.
+- Browser QA at 390 × 844 and 375 × 667: device feedback and form remain visible; forward/backward scrolling across scene boundaries produced zero deviation from the expected sticky position in the sampled DOM measurements, with no pin spacers. This is responsive Chromium QA; physical iPhone Safari toolbar behavior has not been verified on-device.
+
 ## Findings
 
 No actionable P0, P1, or P2 differences remain.
