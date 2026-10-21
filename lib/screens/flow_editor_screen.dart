@@ -127,7 +127,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
     final id = _selectedNodeId;
     if (id == null) return null;
     for (final node in _visibleNodes) {
-      if (node['id']?.toString() == id) return node;
+      if (node['id']?.toString() == id && !isJunctionNode(node)) return node;
     }
     return null;
   }
@@ -275,13 +275,15 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       final node = next.firstWhere((item) => item['id'].toString() == id);
       var x = (((node['x'] as num?)?.toDouble() ?? 0) / 20).round() * 20.0;
       var y = (((node['y'] as num?)?.toDouble() ?? 0) / 20).round() * 20.0;
-      for (final peer in _visibleNodes.where(
-        (item) => item['id'].toString() != id,
-      )) {
-        final peerX = (peer['x'] as num?)?.toDouble();
-        final peerY = (peer['y'] as num?)?.toDouble();
-        if (peerX != null && (x - peerX).abs() < 12) x = peerX;
-        if (peerY != null && (y - peerY).abs() < 12) y = peerY;
+      if (!isJunctionNode(node)) {
+        for (final peer in _visibleNodes.where(
+          (item) => item['id'].toString() != id && !isJunctionNode(item),
+        )) {
+          final peerX = (peer['x'] as num?)?.toDouble();
+          final peerY = (peer['y'] as num?)?.toDouble();
+          if (peerX != null && (x - peerX).abs() < 12) x = peerX;
+          if (peerY != null && (y - peerY).abs() < 12) y = peerY;
+        }
       }
       node['x'] = x.round();
       node['y'] = y.round();
@@ -480,6 +482,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
 
   Future<void> _editNode(String id) async {
     final original = _nodes.firstWhere((node) => node['id'].toString() == id);
+    if (isJunctionNode(original)) return;
     final type = original['type']?.toString() ?? '';
     if (!_isDemo && !_nodeFieldLabels.containsKey(type)) {
       await _loadNodeFieldLabels([type])
@@ -608,7 +611,10 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
               ...tabs.map((tab) {
                 final id = tab['id'].toString();
                 final count = _nodes
-                    .where((node) => node['z']?.toString() == id)
+                    .where(
+                      (node) =>
+                          node['z']?.toString() == id && !isJunctionNode(node),
+                    )
                     .length;
                 return ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 5),
@@ -704,6 +710,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
         builder: (context, setSheetState) {
           final query = controller.text.trim().toLowerCase();
           final results = _visibleNodes.where((node) {
+            if (isJunctionNode(node)) return false;
             final haystack =
                 '${nodeTitle(node)} ${node['type']} ${nodeSubtitle(node)}'
                     .toLowerCase();
@@ -1456,6 +1463,7 @@ class _NodePickerSheetState extends State<_NodePickerSheet> {
     ];
     final allKinds = <NodeKind>[...nodeKinds, ...widget.additionalNodeKinds];
     final available = allKinds.where((kind) {
+      if (kind.type == 'junction') return false;
       if (widget.acceptsInput && !nodeHasInput({'type': kind.type})) {
         return false;
       }

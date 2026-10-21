@@ -71,6 +71,11 @@ String nodeTypeLabel(String type) {
   return words.isEmpty ? 'Node' : words;
 }
 
+/// Node-RED uses a junction as a flow-routing point. It has a position and
+/// wires, but it is rendered as a small point on the wire instead of a node
+/// card with editable fields.
+bool isJunctionNode(FlowNode node) => node['type']?.toString() == 'junction';
+
 String nodeSubtitle(FlowNode node) {
   final type = node['type']?.toString() ?? '';
   if (type == 'inject' && node['repeat']?.toString().isNotEmpty == true) {
@@ -159,6 +164,7 @@ bool nodeHasInput(FlowNode node) => !const {
   'http in',
   'mqtt in',
   'comment',
+  'junction',
 }.contains(node['type']);
 
 bool nodeHasOutput(FlowNode node) => !const {
@@ -167,6 +173,7 @@ bool nodeHasOutput(FlowNode node) => !const {
   'link out',
   'mqtt out',
   'comment',
+  'junction',
 }.contains(node['type']);
 
 RivlenNodeColor nodeColor(String type) {

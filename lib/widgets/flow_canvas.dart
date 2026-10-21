@@ -61,6 +61,7 @@ class FlowCanvas extends StatefulWidget {
 }
 
 const _compactCoordinateScale = 1.45;
+const _junctionDiameter = 16.0;
 
 class FlowCanvasState extends State<FlowCanvas> {
   static const _minimumScale = 0.38;
@@ -165,6 +166,7 @@ class FlowCanvasState extends State<FlowCanvas> {
     final placed = _placedNodesFor(widget.nodes, compact: _compactLayout);
     for (final item in placed.reversed) {
       final node = item.node;
+      if (isJunctionNode(node)) continue;
       final center = item.rect.center;
       if (nodeHasInput(node)) {
         final input = Offset(center.dx - item.rect.width / 2, center.dy);
@@ -214,7 +216,7 @@ class FlowCanvasState extends State<FlowCanvas> {
           final to = byId[target?.toString()];
           if (to == null) continue;
           final fromPoint = _outputWorld(item, output);
-          final toPoint = Offset(to.rect.left, to.rect.center.dy);
+          final toPoint = _inputWorld(to);
           final start = _screen(fromPoint);
           final end = _screen(toPoint);
           final path = _wirePath(start, end);
@@ -259,6 +261,13 @@ class FlowCanvasState extends State<FlowCanvas> {
     }
     if (port != null && !port.output && _pendingSourceId != null) {
       _wireSource = _PortHit(_pendingSourceId!, _pendingOutputIndex, true);
+      return;
+    }
+    // A junction is a draggable point on the wire. Pick it before testing
+    // the nearby wire so tapping the dot never selects the underlying link.
+    final junction = _nodeAt(local);
+    if (junction != null && isJunctionNode(junction.node)) {
+      _dragNodeId = junction.node['id'].toString();
       return;
     }
     final link = _linkAt(local);
@@ -572,26 +581,41 @@ List<_PlacedNode> _placedNodesFor(
   bool compact = false,
 }) {
   final placed = <_PlacedNode>[];
+  // Collision avoidance is for cards only. A junction is intentionally
+  // allowed to sit on a wire and must not push nearby cards away.
+  final collisionPeers = <_PlacedNode>[];
   for (var index = 0; index < nodes.length; index++) {
     final node = nodes[index];
+    final junction = isJunctionNode(node);
     final x = node['x'] is num
         ? (node['x'] as num).toDouble()
         : 180.0 + index * 220;
     final y = node['y'] is num
         ? (node['y'] as num).toDouble()
         : 180.0 + (index % 3) * 100;
-    final width = node['type'] == 'comment' ? 200.0 : 184.0;
-    final height = node['type'] == 'comment' ? 48.0 : 68.0;
+    final width = junction
+        ? _junctionDiameter
+        : node['type'] == 'comment'
+        ? 200.0
+        : 184.0;
+    final height = junction
+        ? _junctionDiameter
+        : node['type'] == 'comment'
+        ? 48.0
+        : 68.0;
+    final requested = Offset(
+      compact ? x * _compactCoordinateScale : x,
+      compact ? y * _compactCoordinateScale : y,
+    );
     final center = compact
-        ? _collisionFreeCenter(
-            Offset(x * _compactCoordinateScale, y * _compactCoordinateScale),
-            width,
-            height,
-            placed,
-          )
-        : Offset(x, y);
+        ? junction
+              ? requested
+              : _collisionFreeCenter(requested, width, height, collisionPeers)
+        : requested;
     final rect = Rect.fromCenter(center: center, width: width, height: height);
-    placed.add(_PlacedNode(node, rect, index));
+    final item = _PlacedNode(node, rect, index);
+    placed.add(item);
+    if (!junction) collisionPeers.add(item);
   }
   return placed;
 }
@@ -631,10 +655,18 @@ Offset _collisionFreeCenter(
   return candidate;
 }
 
-Offset _outputWorld(_PlacedNode item, int outputIndex) => Offset(
-  item.rect.right,
-  item.rect.center.dy + _outputOffset(outputIndex, nodeOutputCount(item.node)),
-);
+Offset _inputWorld(_PlacedNode item) => isJunctionNode(item.node)
+    ? item.rect.center
+    : Offset(item.rect.left, item.rect.center.dy);
+
+Offset _outputWorld(_PlacedNode item, int outputIndex) =>
+    isJunctionNode(item.node)
+    ? item.rect.center
+    : Offset(
+        item.rect.right,
+        item.rect.center.dy +
+            _outputOffset(outputIndex, nodeOutputCount(item.node)),
+      );
 
 double _outputOffset(int index, int count) {
   if (count <= 1) return 0;
@@ -739,7 +771,7 @@ class _FlowCanvasPainter extends CustomPainter {
         );
         final path = _wirePath(
           _outputWorld(item, output),
-          Offset(destination.rect.left, destination.rect.center.dy),
+          _inputWorld(destination),
         );
         final isSelected = link == selectedLink;
         canvas.drawPath(
@@ -757,6 +789,10 @@ class _FlowCanvasPainter extends CustomPainter {
   void _drawNode(Canvas canvas, _PlacedNode item) {
     final node = item.node;
     final rect = item.rect;
+    if (isJunctionNode(node)) {
+      _drawJunction(canvas, item);
+      return;
+    }
     final type = node['type']?.toString() ?? '';
     final color = nodeColor(type).color;
     final selected = node['id']?.toString() == selectedNodeId;
@@ -827,6 +863,33 @@ class _FlowCanvasPainter extends CustomPainter {
               : RivlenColors.wine,
         );
       }
+    }
+  }
+
+  void _drawJunction(Canvas canvas, _PlacedNode item) {
+    final center = item.rect.center;
+    final selected = item.node['id']?.toString() == selectedNodeId;
+    // The light halo keeps the wire readable underneath the dot. The dot is
+    // deliberately small, while the hit area remains the full junction rect.
+    canvas.drawCircle(
+      center,
+      selected ? 10.5 : 9,
+      Paint()..color = RivlenColors.surface,
+    );
+    canvas.drawCircle(
+      center,
+      selected ? 8.5 : 7,
+      Paint()..color = selected ? RivlenColors.coral : RivlenColors.wine,
+    );
+    if (selected) {
+      canvas.drawCircle(
+        center,
+        11.5,
+        Paint()
+          ..color = RivlenColors.coral.withValues(alpha: 0.5)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
     }
   }
 
