@@ -117,6 +117,11 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
         _tabs.isEmpty ? {'id': _activeTabId, 'label': 'Flow'} : _tabs.first,
   );
 
+  String _flowLabel(FlowNode tab) {
+    final label = tab['label']?.toString().trim() ?? '';
+    return label.isEmpty ? 'Flow' : label;
+  }
+
   List<FlowNode> get _visibleNodes => _nodes
       .where(
         (node) =>
@@ -604,13 +609,31 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                 ),
               ),
               const SizedBox(height: 17),
-              const Text(
-                '切换 Flow',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              Row(
+                children: [
+                  const Text(
+                    '切换 Flow',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
+                  const Spacer(),
+                  FilledButton.tonalIcon(
+                    onPressed: () => Navigator.pop(context, '__create'),
+                    icon: Icon(Icons.add_rounded, size: 18),
+                    label: const Text('新建 Flow'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: Size.zero,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 8,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               ...tabs.map((tab) {
                 final id = tab['id'].toString();
+                final canDelete = tabs.length > 1;
                 final count = _nodes
                     .where(
                       (node) =>
@@ -628,18 +651,24 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                         ? RivlenColors.wine
                         : RivlenColors.muted,
                   ),
-                  title: Text(
-                    (tab['label']?.toString().trim().isNotEmpty ?? false)
-                        ? tab['label'].toString()
-                        : 'Flow',
-                  ),
+                  title: Text(_flowLabel(tab)),
                   subtitle: Text('$count 个节点'),
-                  trailing: IconButton(
-                    tooltip: '重命名 Flow',
-                    icon: Icon(Icons.edit_outlined, size: 18),
-                    onPressed: () async {
-                      Navigator.pop(context, 'rename:$id');
-                    },
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: '重命名 Flow',
+                        icon: Icon(Icons.edit_outlined, size: 18),
+                        onPressed: () => Navigator.pop(context, 'rename:$id'),
+                      ),
+                      IconButton(
+                        tooltip: canDelete ? '删除 Flow' : '至少保留一个 Flow',
+                        icon: Icon(Icons.delete_outline_rounded, size: 18),
+                        onPressed: canDelete
+                            ? () => Navigator.pop(context, 'delete:$id')
+                            : null,
+                      ),
+                    ],
                   ),
                   onTap: () => Navigator.pop(context, id),
                 );
@@ -650,8 +679,16 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       ),
     );
     if (selected == null || !mounted) return;
+    if (selected == '__create') {
+      await _createFlow();
+      return;
+    }
     if (selected.startsWith('rename:')) {
       await _renameFlow(selected.substring(7));
+      return;
+    }
+    if (selected.startsWith('delete:')) {
+      await _deleteFlow(selected.substring(7));
       return;
     }
     setState(() {
@@ -696,6 +733,167 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
     final target = next.firstWhere((node) => node['id'].toString() == id);
     target['label'] = value;
     _commit(next);
+  }
+
+  String _nextFlowName() {
+    final names = _tabs.map(_flowLabel).toSet();
+    var index = 1;
+    while (names.contains('Flow $index')) {
+      index++;
+    }
+    return 'Flow $index';
+  }
+
+  Future<void> _createFlow() async {
+    final controller = TextEditingController(text: _nextFlowName());
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新建 Flow'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          decoration: InputDecoration(labelText: 'Flow 名称'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('创建'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    final name = value?.trim() ?? '';
+    if (name.isEmpty || !mounted) return;
+    final id = createNodeId();
+    final next = cloneNodes(_nodes)
+      ..add({
+        'id': id,
+        'type': 'tab',
+        'label': name,
+        'disabled': false,
+        'info': '',
+        'env': [],
+      });
+    _commit(next);
+    setState(() {
+      _activeTabId = id;
+      _selectedNodeId = null;
+      _selectedLink = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _canvasKey.currentState?.resetView(),
+    );
+  }
+
+  Future<void> _deleteFlow(String id) async {
+    final tabs = _tabs;
+    if (tabs.length <= 1) {
+      _showMessage('至少保留一个 Flow');
+      return;
+    }
+    final tab = tabs.firstWhere(
+      (item) => item['id'].toString() == id,
+      orElse: () => <String, dynamic>{},
+    );
+    if (tab.isEmpty) return;
+    final expectedName = _flowLabel(tab);
+    final controller = TextEditingController();
+    var errorText = '';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('删除 Flow？'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            onChanged: (_) {
+              if (errorText.isNotEmpty) {
+                setDialogState(() => errorText = '');
+              }
+            },
+            decoration: InputDecoration(
+              labelText: '输入完整 Flow 名称',
+              hintText: expectedName,
+              errorText: errorText.isEmpty ? null : errorText,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: RivlenColors.wine,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                if (controller.text.trim() != expectedName) {
+                  setDialogState(() => errorText = '名称不匹配，请完整输入 Flow 名称');
+                  return;
+                }
+                Navigator.pop(context, true);
+              },
+              child: const Text('删除'),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    if (confirmed != true || !mounted) return;
+
+    final removedIds = _nodes
+        .where(
+          (node) => node['id']?.toString() == id || node['z']?.toString() == id,
+        )
+        .map((node) => node['id']?.toString())
+        .whereType<String>()
+        .toSet();
+    final next = cloneNodes(_nodes)
+      ..removeWhere(
+        (node) => node['id']?.toString() == id || node['z']?.toString() == id,
+      );
+    for (final node in next) {
+      final wires = node['wires'];
+      if (wires is List) {
+        node['wires'] = wires
+            .map(
+              (port) => port is List
+                  ? port
+                        .where(
+                          (target) => !removedIds.contains(target?.toString()),
+                        )
+                        .toList()
+                  : <dynamic>[],
+            )
+            .toList();
+      }
+    }
+    final activeWasDeleted = _activeTabId == id;
+    _commit(next);
+    if (activeWasDeleted) {
+      final remaining = next.where((node) => node['type'] == 'tab');
+      final nextTab = remaining.first;
+      setState(() {
+        _activeTabId = nextTab['id'].toString();
+        _selectedNodeId = null;
+        _selectedLink = null;
+      });
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _canvasKey.currentState?.resetView(),
+      );
+    }
+    _showMessage('Flow 已删除 · 可撤销');
   }
 
   Future<void> _search() async {
