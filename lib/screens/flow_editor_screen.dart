@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -52,6 +53,8 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
   final _canvasKey = GlobalKey<FlowCanvasState>();
   late final NodeRedApi _api;
   late final NodeRedDebugService _debugService;
+  StreamSubscription<NodeRedDebugEvent>? _debugSubscription;
+  Timer? _debugPulseTimer;
   late List<FlowNode> _nodes;
   late List<FlowNode> _deployedNodes;
   late FlowBundle _bundle;
@@ -72,6 +75,9 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
   HomeAssistantCatalog _haCatalog = const HomeAssistantCatalog();
   Future<void>? _haCatalogRequest;
   bool _haCatalogLoaded = false;
+  bool _debugUnread = false;
+  bool _debugPulse = false;
+  bool _debugPageOpen = false;
 
   bool get _isDemo => widget.connection.id == 'demo';
   bool get _isDirty => _canonical(_nodes) != _canonical(_deployedNodes);
@@ -83,6 +89,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
     super.initState();
     _api = NodeRedApi();
     _debugService = NodeRedDebugService(connection: widget.connection);
+    _debugSubscription = _debugService.events.listen(_handleDebugEvent);
     _bundle = widget.initialBundle;
     _nodes = cloneNodes(widget.initialBundle.nodes);
     _deployedNodes = cloneNodes(widget.initialBundle.nodes);
@@ -110,9 +117,46 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
 
   @override
   void dispose() {
+    _debugPulseTimer?.cancel();
+    _debugSubscription?.cancel();
     _debugService.dispose();
     _api.dispose();
     super.dispose();
+  }
+
+  void _handleDebugEvent(NodeRedDebugEvent event) {
+    if (!mounted || event.kind != NodeRedDebugEventKind.message) return;
+    if (_debugPageOpen) return;
+    _debugPulseTimer?.cancel();
+    setState(() {
+      _debugUnread = true;
+      _debugPulse = true;
+    });
+    _debugPulseTimer = Timer(const Duration(milliseconds: 850), () {
+      if (mounted) setState(() => _debugPulse = false);
+    });
+  }
+
+  Future<void> _openDebugPage() async {
+    if (!mounted) return;
+    _debugPulseTimer?.cancel();
+    setState(() {
+      _debugUnread = false;
+      _debugPulse = false;
+      _debugPageOpen = true;
+    });
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) =>
+            DebugScreen(connection: widget.connection, service: _debugService),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      _debugPageOpen = false;
+      _debugUnread = false;
+      _debugPulse = false;
+    });
   }
 
   List<FlowNode> get _tabs =>
@@ -1102,14 +1146,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
         _canvasKey.currentState?.resetView();
         break;
       case 'debug':
-        await Navigator.of(context).push<void>(
-          MaterialPageRoute(
-            builder: (_) => DebugScreen(
-              connection: widget.connection,
-              service: _debugService,
-            ),
-          ),
-        );
+        await _openDebugPage();
         break;
       case 'copy':
         await Clipboard.setData(ClipboardData(text: jsonEncode(_nodes)));
@@ -1476,7 +1513,10 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
               tabLabel: tabLabel,
               onFlows: _showFlows,
               onSearch: _search,
+              onDebug: _openDebugPage,
               onMore: _more,
+              debugUnread: _debugUnread,
+              debugPulse: _debugPulse,
             ),
           ],
         ),
@@ -1590,12 +1630,18 @@ class _BottomBar extends StatelessWidget {
     required this.tabLabel,
     required this.onFlows,
     required this.onSearch,
+    required this.onDebug,
     required this.onMore,
+    required this.debugUnread,
+    required this.debugPulse,
   });
   final String tabLabel;
   final VoidCallback onFlows;
   final VoidCallback onSearch;
+  final VoidCallback onDebug;
   final VoidCallback onMore;
+  final bool debugUnread;
+  final bool debugPulse;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -1624,6 +1670,13 @@ class _BottomBar extends StatelessWidget {
               ),
             ),
             Expanded(
+              child: _DebugBottomAction(
+                onTap: onDebug,
+                unread: debugUnread,
+                pulse: debugPulse,
+              ),
+            ),
+            Expanded(
               child: _BottomAction(
                 icon: Icons.more_horiz_rounded,
                 label: '更多',
@@ -1633,6 +1686,71 @@ class _BottomBar extends StatelessWidget {
           ],
         ),
       ),
+    ),
+  );
+}
+
+class _DebugBottomAction extends StatelessWidget {
+  const _DebugBottomAction({
+    required this.onTap,
+    required this.unread,
+    required this.pulse,
+  });
+
+  final VoidCallback onTap;
+  final bool unread;
+  final bool pulse;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          height: 24,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              AnimatedScale(
+                scale: pulse ? 1.22 : 1,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutBack,
+                child: Icon(
+                  Icons.bug_report_outlined,
+                  size: 19,
+                  color: unread ? RivlenColors.wine : RivlenColors.ink,
+                ),
+              ),
+              if (unread)
+                Positioned(
+                  right: -7,
+                  top: -4,
+                  child: AnimatedOpacity(
+                    opacity: pulse ? 0.55 : 1,
+                    duration: const Duration(milliseconds: 180),
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: RivlenColors.coral,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '调试',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 10, color: RivlenColors.muted),
+        ),
+      ],
     ),
   );
 }
