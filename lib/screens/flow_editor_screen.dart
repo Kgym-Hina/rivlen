@@ -9,6 +9,7 @@ import '../models/home_assistant_catalog.dart';
 import '../models/node_red_connection.dart';
 import '../models/node_editor_schema.dart';
 import '../services/node_red_api.dart';
+import '../services/node_red_debug_service.dart';
 import '../theme.dart';
 import '../widgets/flow_canvas.dart';
 import '../widgets/home_assistant_node_editor.dart';
@@ -50,6 +51,7 @@ class FlowEditorScreen extends StatefulWidget {
 class _FlowEditorScreenState extends State<FlowEditorScreen> {
   final _canvasKey = GlobalKey<FlowCanvasState>();
   late final NodeRedApi _api;
+  late final NodeRedDebugService _debugService;
   late List<FlowNode> _nodes;
   late List<FlowNode> _deployedNodes;
   late FlowBundle _bundle;
@@ -80,6 +82,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
   void initState() {
     super.initState();
     _api = NodeRedApi();
+    _debugService = NodeRedDebugService(connection: widget.connection);
     _bundle = widget.initialBundle;
     _nodes = cloneNodes(widget.initialBundle.nodes);
     _deployedNodes = cloneNodes(widget.initialBundle.nodes);
@@ -101,11 +104,13 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       _loadNodeFieldLabels();
       _loadInstalledNodeKinds();
       _loadHomeAssistantCatalog();
+      if (!_isDemo) _debugService.connect();
     });
   }
 
   @override
   void dispose() {
+    _debugService.dispose();
     _api.dispose();
     super.dispose();
   }
@@ -1099,7 +1104,10 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       case 'debug':
         await Navigator.of(context).push<void>(
           MaterialPageRoute(
-            builder: (_) => DebugScreen(connection: widget.connection),
+            builder: (_) => DebugScreen(
+              connection: widget.connection,
+              service: _debugService,
+            ),
           ),
         );
         break;

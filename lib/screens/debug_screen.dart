@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -7,9 +8,10 @@ import '../services/node_red_debug_service.dart';
 import '../theme.dart';
 
 class DebugScreen extends StatefulWidget {
-  const DebugScreen({super.key, required this.connection});
+  const DebugScreen({super.key, required this.connection, this.service});
 
   final NodeRedConnection connection;
+  final NodeRedDebugService? service;
 
   @override
   State<DebugScreen> createState() => _DebugScreenState();
@@ -17,6 +19,8 @@ class DebugScreen extends StatefulWidget {
 
 class _DebugScreenState extends State<DebugScreen> {
   late final NodeRedDebugService _service;
+  late final bool _ownsService;
+  StreamSubscription<NodeRedDebugEvent>? _subscription;
   final List<NodeRedDebugMessage> _messages = [];
   String _status = '未连接';
   String? _error;
@@ -24,18 +28,23 @@ class _DebugScreenState extends State<DebugScreen> {
   @override
   void initState() {
     super.initState();
-    _service = NodeRedDebugService(connection: widget.connection);
-    _service.events.listen(_handleEvent);
+    _ownsService = widget.service == null;
+    _service =
+        widget.service ?? NodeRedDebugService(connection: widget.connection);
+    _messages.addAll(_service.history);
+    _subscription = _service.events.listen(_handleEvent);
     if (widget.connection.id == 'demo') {
       _status = '示例画布没有实时调试输出';
     } else {
+      if (_service.isConnected) _status = '已连接';
       _service.connect();
     }
   }
 
   @override
   void dispose() {
-    _service.dispose();
+    _subscription?.cancel();
+    if (_ownsService) _service.dispose();
     super.dispose();
   }
 

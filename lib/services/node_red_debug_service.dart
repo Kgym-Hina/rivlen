@@ -64,15 +64,20 @@ class NodeRedDebugService {
   final NodeRedApi _api;
   final StreamController<NodeRedDebugEvent> _events =
       StreamController<NodeRedDebugEvent>.broadcast();
+  final List<NodeRedDebugMessage> _history = <NodeRedDebugMessage>[];
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
   bool _disposed = false;
+  bool _connecting = false;
   bool _subscribed = false;
 
   Stream<NodeRedDebugEvent> get events => _events.stream;
+  List<NodeRedDebugMessage> get history => List.unmodifiable(_history);
+  bool get isConnected => _channel != null && _subscribed;
 
   Future<void> connect() async {
-    if (_disposed || _channel != null) return;
+    if (_disposed || _channel != null || _connecting) return;
+    _connecting = true;
     _emit(const NodeRedDebugEvent.status(NodeRedDebugEventKind.connecting));
     try {
       final headers = await _api.webSocketHeaders(connection);
@@ -83,7 +88,10 @@ class NodeRedDebugService {
       );
       _channel = channel;
       await channel.ready;
-      if (_disposed) return;
+      if (_disposed) {
+        clearConnection();
+        return;
+      }
       _subscription = channel.stream.listen(
         _handleFrame,
         onError: _handleError,
@@ -102,6 +110,8 @@ class NodeRedDebugService {
       _channel = null;
       _emit(NodeRedDebugEvent.error(error));
       _emit(const NodeRedDebugEvent.status(NodeRedDebugEventKind.disconnected));
+    } finally {
+      _connecting = false;
     }
   }
 
@@ -154,15 +164,14 @@ class NodeRedDebugService {
       if (item is! Map) continue;
       final topic = item['topic']?.toString() ?? '';
       if (topic != 'debug' && !topic.startsWith('debug/')) continue;
-      _emit(
-        NodeRedDebugEvent.message(
-          NodeRedDebugMessage(
-            receivedAt: DateTime.now(),
-            topic: topic,
-            data: item['data'],
-          ),
-        ),
+      final message = NodeRedDebugMessage(
+        receivedAt: DateTime.now(),
+        topic: topic,
+        data: item['data'],
       );
+      _history.insert(0, message);
+      if (_history.length > 300) _history.removeLast();
+      _emit(NodeRedDebugEvent.message(message));
     }
   }
 
