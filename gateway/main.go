@@ -36,6 +36,7 @@ const (
 type config struct {
 	listenAddr      string
 	nodeRedURL      *url.URL
+	nodeRedAuthMode string
 	publicURL       string
 	dataFile        string
 	pairingPassword string
@@ -143,6 +144,10 @@ func main() {
 func readConfig() (config, error) {
 	listen := env("RIVLEN_GATEWAY_LISTEN", "127.0.0.1:8787")
 	nodeURL := env("RIVLEN_NODE_RED_URL", "http://127.0.0.1:1880")
+	nodeRedAuthMode := env("RIVLEN_NODE_RED_AUTH_MODE", "admin")
+	if nodeRedAuthMode != "admin" && nodeRedAuthMode != "basic" {
+		return config{}, errors.New("RIVLEN_NODE_RED_AUTH_MODE must be admin or basic")
+	}
 	parsedNodeURL, err := url.Parse(nodeURL)
 	if err != nil || !parsedNodeURL.IsAbs() || parsedNodeURL.Host == "" || (parsedNodeURL.Scheme != "http" && parsedNodeURL.Scheme != "https") || parsedNodeURL.User != nil || parsedNodeURL.RawQuery != "" || parsedNodeURL.Fragment != "" {
 		return config{}, errors.New("RIVLEN_NODE_RED_URL must be an HTTP or HTTPS Node-RED base URL without credentials, query, or fragment")
@@ -156,8 +161,12 @@ func readConfig() (config, error) {
 	if (username == "") != (adminPassword == "") {
 		return config{}, errors.New("set both RIVLEN_NODE_RED_USERNAME and RIVLEN_NODE_RED_PASSWORD, or neither")
 	}
-	if username != "" && os.Getenv("RIVLEN_NODE_RED_TOKEN") != "" {
+	nodeRedToken := os.Getenv("RIVLEN_NODE_RED_TOKEN")
+	if nodeRedAuthMode == "admin" && username != "" && nodeRedToken != "" {
 		return config{}, errors.New("configure either RIVLEN_NODE_RED_TOKEN or Node-RED username/password, not both")
+	}
+	if nodeRedAuthMode == "basic" && (username == "" || nodeRedToken != "") {
+		return config{}, errors.New("basic auth requires Node-RED username/password and cannot be combined with RIVLEN_NODE_RED_TOKEN")
 	}
 	tlsCert := os.Getenv("RIVLEN_TLS_CERT")
 	tlsKey := os.Getenv("RIVLEN_TLS_KEY")
@@ -167,10 +176,11 @@ func readConfig() (config, error) {
 	return config{
 		listenAddr:      listen,
 		nodeRedURL:      parsedNodeURL,
+		nodeRedAuthMode: nodeRedAuthMode,
 		publicURL:       strings.TrimRight(os.Getenv("RIVLEN_PUBLIC_URL"), "/"),
 		dataFile:        env("RIVLEN_DATA_FILE", "./data/gateway.json"),
 		pairingPassword: password,
-		nodeRedToken:    os.Getenv("RIVLEN_NODE_RED_TOKEN"),
+		nodeRedToken:    nodeRedToken,
 		nodeRedUsername: username,
 		nodeRedPassword: adminPassword,
 		tlsCertFile:     tlsCert,
@@ -627,7 +637,7 @@ func samePairingFile(a, b pairingFile) bool {
 
 func (s *server) nodeRedRequest(ctx context.Context, method string, headers http.Header, body []byte) (*http.Response, error) {
 	response, err := s.doNodeRed(ctx, method, headers, body, false)
-	if err != nil || response.StatusCode != http.StatusUnauthorized || s.cfg.nodeRedUsername == "" {
+	if err != nil || s.cfg.nodeRedAuthMode != "admin" || response.StatusCode != http.StatusUnauthorized || s.cfg.nodeRedUsername == "" {
 		return response, err
 	}
 	response.Body.Close()
@@ -635,9 +645,13 @@ func (s *server) nodeRedRequest(ctx context.Context, method string, headers http
 }
 
 func (s *server) doNodeRed(ctx context.Context, method string, headers http.Header, body []byte, refresh bool) (*http.Response, error) {
-	token, err := s.nodeRedAuthToken(ctx, refresh)
-	if err != nil {
-		return nil, err
+	token := ""
+	if s.cfg.nodeRedAuthMode == "admin" {
+		var err error
+		token, err = s.nodeRedAuthToken(ctx, refresh)
+		if err != nil {
+			return nil, err
+		}
 	}
 	target := *s.cfg.nodeRedURL
 	prefix := strings.TrimRight(target.Path, "/")
@@ -656,6 +670,8 @@ func (s *server) doNodeRed(ctx context.Context, method string, headers http.Head
 	}
 	if token != "" {
 		request.Header.Set("Authorization", "Bearer "+token)
+	} else if s.cfg.nodeRedAuthMode == "basic" {
+		request.SetBasicAuth(s.cfg.nodeRedUsername, s.cfg.nodeRedPassword)
 	}
 	return s.client.Do(request)
 }

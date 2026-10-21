@@ -33,6 +33,7 @@ Configuration:
 | `RIVLEN_PUBLIC_URL` | Request host | URL encoded in pairing files; set it when using a public reverse proxy |
 | `RIVLEN_PAIRING_PASSWORD` | Required | Custom password used for pairing |
 | `RIVLEN_DATA_FILE` | `./data/gateway.json` | Persistent gateway ID, device names, token hashes, and access times |
+| `RIVLEN_NODE_RED_AUTH_MODE` | `admin` | Use `basic` for a Home Assistant App port protected by Home Assistant credentials |
 | `RIVLEN_NODE_RED_TOKEN` | Empty | Node-RED Admin API bearer token |
 | `RIVLEN_NODE_RED_USERNAME` | Empty | Node-RED Admin API username |
 | `RIVLEN_NODE_RED_PASSWORD` | Empty | Node-RED Admin API password |
@@ -43,6 +44,12 @@ For an authenticated Node-RED instance, set either `RIVLEN_NODE_RED_TOKEN` or
 both `RIVLEN_NODE_RED_USERNAME` and `RIVLEN_NODE_RED_PASSWORD`. The gateway
 exchanges username and password for a Node-RED token and refreshes it after an
 upstream 401 response. Give that account `flows.read` and `flows.write` scopes.
+
+For the Home Assistant Community Node-RED App's direct port, set
+`RIVLEN_NODE_RED_AUTH_MODE=basic` and provide a Home Assistant username and
+password using `RIVLEN_NODE_RED_USERNAME` and `RIVLEN_NODE_RED_PASSWORD`. The
+App checks those credentials through Home Assistant before forwarding requests
+to Node-RED; this is separate from Node-RED's Admin API token login.
 
 ## Connect Rivlen
 
