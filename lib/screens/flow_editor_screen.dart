@@ -726,7 +726,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                 18 + MediaQuery.viewInsetsOf(context).bottom,
               ),
               child: SizedBox(
-                height: MediaQuery.sizeOf(context).height * 0.72,
+                height: rivlenSheetHeight(context, 0.72),
                 child: Column(
                   children: [
                     Container(
@@ -1501,7 +1501,7 @@ class _NodePickerSheetState extends State<_NodePickerSheet> {
           12 + MediaQuery.viewInsetsOf(context).bottom,
         ),
         child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * 0.79,
+          height: rivlenSheetHeight(context, 0.79),
           child: Column(
             children: [
               Container(
@@ -1764,7 +1764,7 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
       child: Padding(
         padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + viewInsets),
         child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * 0.72,
+          height: rivlenSheetHeight(context, 0.72),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

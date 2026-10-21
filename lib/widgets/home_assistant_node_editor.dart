@@ -358,42 +358,50 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
             return query.isEmpty || haystack.contains(query);
           }).toList();
           return SafeArea(
-            child: SizedBox(
-              height: MediaQuery.sizeOf(context).height * 0.82,
-              child: Column(
-                children: [
-                  const SizedBox(height: 12),
-                  Text('选择动作', style: Theme.of(context).textTheme.titleMedium),
-                  Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: TextField(
-                      controller: search,
-                      onChanged: (_) => setSheetState(() {}),
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(Icons.search_rounded),
-                        hintText: '搜索域或服务',
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: SizedBox(
+                height: rivlenSheetHeight(context, 0.82),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Text(
+                      '选择动作',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: TextField(
+                        controller: search,
+                        onChanged: (_) => setSheetState(() {}),
+                        decoration: InputDecoration(
+                          prefixIcon: Icon(Icons.search_rounded),
+                          hintText: '搜索域或服务',
+                        ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: filtered.length,
-                      itemBuilder: (_, index) {
-                        final service = filtered[index];
-                        return ListTile(
-                          title: Text(service.key),
-                          subtitle: service.description.isEmpty
-                              ? null
-                              : Text(service.description, maxLines: 2),
-                          trailing: service.key == current
-                              ? Icon(Icons.check_rounded)
-                              : null,
-                          onTap: () => Navigator.pop(context, service.key),
-                        );
-                      },
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: filtered.length,
+                        itemBuilder: (_, index) {
+                          final service = filtered[index];
+                          return ListTile(
+                            title: Text(service.key),
+                            subtitle: service.description.isEmpty
+                                ? null
+                                : Text(service.description, maxLines: 2),
+                            trailing: service.key == current
+                                ? Icon(Icons.check_rounded)
+                                : null,
+                            onTap: () => Navigator.pop(context, service.key),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
@@ -455,60 +463,66 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
             return normalized.isEmpty || haystack.contains(normalized);
           }).toList();
           return SafeArea(
-            child: SizedBox(
-              height: MediaQuery.sizeOf(context).height * 0.82,
-              child: Column(
-                children: [
-                  const SizedBox(height: 12),
-                  Text(title, style: Theme.of(context).textTheme.titleMedium),
-                  Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: TextField(
-                      controller: query,
-                      onChanged: (_) => setSheetState(() {}),
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(Icons.search_rounded),
-                        hintText: '搜索名称或 ID',
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: SizedBox(
+                height: rivlenSheetHeight(context, 0.82),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Text(title, style: Theme.of(context).textTheme.titleMedium),
+                    Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: TextField(
+                        controller: query,
+                        onChanged: (_) => setSheetState(() {}),
+                        decoration: InputDecoration(
+                          prefixIcon: Icon(Icons.search_rounded),
+                          hintText: '搜索名称或 ID',
+                        ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: filtered.length,
-                      itemBuilder: (_, index) {
-                        final option = filtered[index];
-                        final checked = picked.contains(option.id);
-                        return CheckboxListTile(
-                          value: checked,
-                          title: Text(
-                            option.label.isEmpty ? option.id : option.label,
-                          ),
-                          subtitle: option.label.isEmpty
-                              ? null
-                              : Text(option.id),
-                          onChanged: (value) => setSheetState(() {
-                            if (value == true) {
-                              picked.add(option.id);
-                            } else {
-                              picked.remove(option.id);
-                            }
-                          }),
-                        );
-                      },
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
-                    child: FilledButton(
-                      onPressed: () => Navigator.pop(context, picked.toList()),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                        backgroundColor: RivlenColors.wine,
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: filtered.length,
+                        itemBuilder: (_, index) {
+                          final option = filtered[index];
+                          final checked = picked.contains(option.id);
+                          return CheckboxListTile(
+                            value: checked,
+                            title: Text(
+                              option.label.isEmpty ? option.id : option.label,
+                            ),
+                            subtitle: option.label.isEmpty
+                                ? null
+                                : Text(option.id),
+                            onChanged: (value) => setSheetState(() {
+                              if (value == true) {
+                                picked.add(option.id);
+                              } else {
+                                picked.remove(option.id);
+                              }
+                            }),
+                          );
+                        },
                       ),
-                      child: Text('完成（${picked.length}）'),
                     ),
-                  ),
-                ],
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+                      child: FilledButton(
+                        onPressed: () =>
+                            Navigator.pop(context, picked.toList()),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          backgroundColor: RivlenColors.wine,
+                        ),
+                        child: Text('完成（${picked.length}）'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -1077,7 +1091,7 @@ class _HomeAssistantNodeEditorState extends State<HomeAssistantNodeEditor> {
           16 + MediaQuery.viewInsetsOf(context).bottom,
         ),
         child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * 0.86,
+          height: rivlenSheetHeight(context, 0.86),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

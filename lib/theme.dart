@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -50,6 +52,15 @@ class RivlenThemeController extends ChangeNotifier {
 }
 
 final rivlenThemeController = RivlenThemeController();
+
+/// Keeps a scrollable bottom sheet inside the visible area when the keyboard
+/// is open. The keyboard inset is applied as bottom padding by each sheet;
+/// this height is the remaining content area above it.
+double rivlenSheetHeight(BuildContext context, double fraction) {
+  final media = MediaQuery.of(context);
+  final available = media.size.height - media.viewInsets.bottom - 16;
+  return math.min(media.size.height * fraction, math.max(200.0, available));
+}
 
 ThemeData buildRivlenTheme() {
   final brightness = RivlenColors.isDark ? Brightness.dark : Brightness.light;
