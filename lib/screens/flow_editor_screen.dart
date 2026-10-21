@@ -77,6 +77,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
   bool _haCatalogLoaded = false;
   bool _debugUnread = false;
   bool _debugPulse = false;
+  String? _debugFlashNodeId;
   bool _debugPageOpen = false;
 
   bool get _isDemo => widget.connection.id == 'demo';
@@ -131,9 +132,16 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
     setState(() {
       _debugUnread = true;
       _debugPulse = true;
+      final nodeId = event.message?.nodeId.trim();
+      _debugFlashNodeId = nodeId == null || nodeId.isEmpty ? null : nodeId;
     });
     _debugPulseTimer = Timer(const Duration(milliseconds: 850), () {
-      if (mounted) setState(() => _debugPulse = false);
+      if (mounted) {
+        setState(() {
+          _debugPulse = false;
+          _debugFlashNodeId = null;
+        });
+      }
     });
   }
 
@@ -143,6 +151,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
     setState(() {
       _debugUnread = false;
       _debugPulse = false;
+      _debugFlashNodeId = null;
       _debugPageOpen = true;
     });
     await Navigator.of(context).push<void>(
@@ -156,6 +165,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
       _debugPageOpen = false;
       _debugUnread = false;
       _debugPulse = false;
+      _debugFlashNodeId = null;
     });
   }
 
@@ -1478,6 +1488,7 @@ class _FlowEditorScreenState extends State<FlowEditorScreen> {
                 key: _canvasKey,
                 nodes: _visibleNodes,
                 selectedNodeId: _selectedNodeId,
+                debugFlashNodeId: _debugPulse ? _debugFlashNodeId : null,
                 selectedLink: _selectedLink,
                 onSelectNode: (id) => setState(() {
                   _selectedNodeId = id;

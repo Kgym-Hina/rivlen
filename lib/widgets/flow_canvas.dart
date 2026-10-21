@@ -28,6 +28,7 @@ class FlowCanvas extends StatefulWidget {
     super.key,
     required this.nodes,
     required this.selectedNodeId,
+    required this.debugFlashNodeId,
     required this.selectedLink,
     required this.onSelectNode,
     required this.onClearSelection,
@@ -43,6 +44,7 @@ class FlowCanvas extends StatefulWidget {
 
   final List<FlowNode> nodes;
   final String? selectedNodeId;
+  final String? debugFlashNodeId;
   final FlowLink? selectedLink;
   final ValueChanged<String> onSelectNode;
   final VoidCallback onClearSelection;
@@ -483,6 +485,7 @@ class FlowCanvasState extends State<FlowCanvas> {
                 scale: _scale,
                 translation: _translation,
                 selectedNodeId: widget.selectedNodeId,
+                debugFlashNodeId: widget.debugFlashNodeId,
                 selectedLink: widget.selectedLink,
                 pendingSourceId: _pendingSourceId,
                 pendingOutputIndex: _pendingOutputIndex,
@@ -707,6 +710,7 @@ class _FlowCanvasPainter extends CustomPainter {
     required this.scale,
     required this.translation,
     required this.selectedNodeId,
+    required this.debugFlashNodeId,
     required this.selectedLink,
     required this.pendingSourceId,
     required this.pendingOutputIndex,
@@ -719,6 +723,7 @@ class _FlowCanvasPainter extends CustomPainter {
   final double scale;
   final Offset translation;
   final String? selectedNodeId;
+  final String? debugFlashNodeId;
   final FlowLink? selectedLink;
   final String? pendingSourceId;
   final int pendingOutputIndex;
@@ -810,6 +815,8 @@ class _FlowCanvasPainter extends CustomPainter {
   void _drawNode(Canvas canvas, _PlacedNode item) {
     final node = item.node;
     final rect = item.rect;
+    final debugFlashing = node['id']?.toString() == debugFlashNodeId;
+    if (debugFlashing) _drawDebugFlash(canvas, rect, isJunctionNode(node));
     if (isJunctionNode(node)) {
       _drawJunction(canvas, item);
       return;
@@ -909,6 +916,40 @@ class _FlowCanvasPainter extends CustomPainter {
         );
       }
     }
+  }
+
+  void _drawDebugFlash(Canvas canvas, Rect rect, bool junction) {
+    if (junction) {
+      canvas.drawCircle(
+        rect.center,
+        rect.width / 2 + 7,
+        Paint()
+          ..color = RivlenColors.coral.withValues(alpha: 0.3)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+      );
+      return;
+    }
+    final glowRect = RRect.fromRectAndRadius(
+      rect.inflate(5),
+      const Radius.circular(12),
+    );
+    canvas.drawRRect(
+      glowRect,
+      Paint()
+        ..color = RivlenColors.coral.withValues(alpha: 0.3)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.inflate(2), const Radius.circular(10)),
+      Paint()
+        ..color = RivlenColors.coral.withValues(alpha: 0.7)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4,
+    );
   }
 
   void _drawJunction(Canvas canvas, _PlacedNode item) {
@@ -1029,6 +1070,7 @@ class _FlowCanvasPainter extends CustomPainter {
       oldDelegate.scale != scale ||
       oldDelegate.translation != translation ||
       oldDelegate.selectedNodeId != selectedNodeId ||
+      oldDelegate.debugFlashNodeId != debugFlashNodeId ||
       oldDelegate.selectedLink != selectedLink ||
       oldDelegate.pendingSourceId != pendingSourceId ||
       oldDelegate.previewPoint != previewPoint ||
