@@ -42,6 +42,7 @@ const copy = {
       body: 'Inject、Function、Home Assistant、Debug：把逻辑放回画布。',
       labels: ['Inject', 'Function', 'Home Assistant', 'Debug'],
       captions: ['触发', '处理', '设备动作', '实时消息'],
+      steps: ['连接节点', '让消息流动', '看见每次响应'],
     },
     story: {
       eyebrow: '02 / 从复杂开始',
@@ -101,6 +102,7 @@ const copy = {
       body: 'Inject, Function, Home Assistant, and Debug stay visible on the canvas.',
       labels: ['Inject', 'Function', 'Home Assistant', 'Debug'],
       captions: ['Trigger', 'Transform', 'Device action', 'Live message'],
+      steps: ['Connect the nodes', 'Follow the message', 'See every response'],
     },
     story: {
       eyebrow: '02 / Start with complexity',
@@ -161,13 +163,111 @@ function App() {
 
   useEffect(() => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) return undefined;
+    if (reduceMotion) {
+      const drawStaticWires = () => {
+        const rail = document.querySelector('.node-rail').getBoundingClientRect();
+        const cards = document.querySelectorAll('.node-card');
+        document.querySelectorAll('.flow-wire').forEach((path, index) => {
+          const from = cards[index].querySelector('.node-port-out').getBoundingClientRect();
+          const to = cards[index + 1].querySelector('.node-port-in').getBoundingClientRect();
+          const sx = from.left + from.width / 2 - rail.left;
+          const sy = from.top + from.height / 2 - rail.top;
+          const ex = to.left + to.width / 2 - rail.left;
+          const ey = to.top + to.height / 2 - rail.top;
+          const d = `M ${sx} ${sy} C ${sx + 20} ${sy} ${ex - 20} ${ey} ${ex} ${ey}`;
+          path.setAttribute('d', d);
+          path.previousElementSibling.setAttribute('d', d);
+        });
+      };
+      drawStaticWires();
+      window.addEventListener('resize', drawStaticWires);
+      return () => window.removeEventListener('resize', drawStaticWires);
+    }
     const context = gsap.context(() => {
       gsap.from('.nav-shell', { y: -24, autoAlpha: 0, duration: 0.8, ease: 'power3.out' });
       gsap.from('.hero-copy > *', { y: 42, autoAlpha: 0, duration: 1, stagger: 0.08, delay: 0.2, ease: 'power3.out' });
       gsap.from('.hero-art', { x: 60, y: 24, rotate: 2, autoAlpha: 0, duration: 1.2, delay: 0.35, ease: 'power3.out' });
       gsap.to('.hero-art', { yPercent: -10, rotate: -1, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true } });
       gsap.utils.toArray('.reveal').forEach((element) => gsap.from(element, { y: 36, autoAlpha: 0, duration: 0.9, ease: 'power3.out', scrollTrigger: { trigger: element, start: 'top 82%', once: true } }));
+      // One pinned canvas: connect, send a message, then reveal the result.
+      const rail = document.querySelector('.node-rail');
+      const cards = gsap.utils.toArray('.node-card');
+      const paths = gsap.utils.toArray('.flow-wire');
+      const packets = gsap.utils.toArray('.flow-packet');
+      const measureWires = () => {
+        const bounds = rail.getBoundingClientRect();
+        paths.forEach((path, index) => {
+          const from = cards[index].querySelector('.node-port-out').getBoundingClientRect();
+          const to = cards[index + 1].querySelector('.node-port-in').getBoundingClientRect();
+          const sx = from.left + from.width / 2 - bounds.left;
+          const sy = from.top + from.height / 2 - bounds.top;
+          const ex = to.left + to.width / 2 - bounds.left;
+          const ey = to.top + to.height / 2 - bounds.top;
+          const middle = (sy + ey) / 2;
+          const bend = window.innerWidth <= 520 ? 20 : 40;
+          const d = index === 1
+            ? `M ${sx} ${sy} C ${sx + bend} ${sy} ${sx + bend} ${middle} ${sx} ${middle} L ${ex} ${middle} C ${ex - bend} ${middle} ${ex - bend} ${ey} ${ex} ${ey}`
+            : `M ${sx} ${sy} C ${sx + 45} ${sy} ${ex - 45} ${ey} ${ex} ${ey}`;
+          path.setAttribute('d', d);
+          path.previousElementSibling.setAttribute('d', d);
+        });
+      };
+      measureWires();
+      gsap.set(paths, { strokeDasharray: 1, strokeDashoffset: 1 });
+      gsap.set('.flow-caption', { autoAlpha: 0, y: 10 });
+      gsap.set('.flow-caption-0', { autoAlpha: 1, y: 0 });
+      gsap.set('.flow-packet, .flow-result, .node-notification', { autoAlpha: 0 });
+      const flow = gsap.timeline({ scrollTrigger: {
+        trigger: '.node-showcase', start: 'top top', end: () => `+=${window.innerHeight * 2.5}`,
+        pin: true, scrub: 0.65, anticipatePin: 1, invalidateOnRefresh: true,
+        onRefreshInit: measureWires,
+      } });
+      flow.from(cards, { opacity: 0.35, stagger: 0.1, duration: 0.6 })
+        .to(paths, { strokeDashoffset: 0, stagger: 0.45, duration: 0.65, ease: 'none' }, 0.5)
+        .to('.flow-caption-0', { autoAlpha: 0, y: -10, duration: 0.2 }, 2.1)
+        .to('.flow-caption-1', { autoAlpha: 1, y: 0, duration: 0.2 }, 2.3);
+      paths.forEach((path, index) => {
+        const travel = { progress: 0 };
+        const packet = packets[index];
+        flow.to(packet, { autoAlpha: 1, duration: 0.05 }, 2.5 + index * 0.5)
+          .to(travel, { progress: 1, duration: 0.5, ease: 'none', onUpdate: () => {
+            const point = path.getPointAtLength(path.getTotalLength() * travel.progress);
+            packet.setAttribute('cx', point.x);
+            packet.setAttribute('cy', point.y);
+          } }, 2.5 + index * 0.5)
+          .to(packet, { autoAlpha: 0, duration: 0.05 }, 3 + index * 0.5)
+          .to(cards[index + 1], { borderColor: '#ea725f', boxShadow: '0 0 35px rgba(234,114,95,.25)', duration: 0.2 }, 3 + index * 0.5)
+          .to(cards[index + 1], { borderColor: '', boxShadow: '', duration: 0.35 }, 3.2 + index * 0.5);
+      });
+      flow.to('.flow-caption-1', { autoAlpha: 0, y: -10, duration: 0.2 }, 4.1)
+        .to('.flow-caption-2', { autoAlpha: 1, y: 0, duration: 0.2 }, 4.3)
+        .to('.node-notification', { autoAlpha: 1, scale: 1.15, duration: 0.2 }, 4.1)
+        .fromTo('.flow-result', { y: 16 }, { y: 0, autoAlpha: 1, duration: 0.4 }, 4.3)
+        .to({}, { duration: 0.6 });
+      gsap.to('.flow-progress span', { scaleX: 1, ease: 'none', scrollTrigger: {
+        trigger: '.node-showcase', start: 'top top', end: () => `+=${window.innerHeight * 2.5}`, scrub: true,
+      } });
+      const form = gsap.timeline({ scrollTrigger: {
+        trigger: '.ha-section', start: 'top top', end: () => `+=${window.innerHeight * 0.9}`,
+        pin: true, scrub: 0.6, anticipatePin: 1,
+      } });
+      form.from('.form-stage', { rotate: 4, scale: 0.92, duration: 0.7 })
+        .from('.form-list label', { x: 35, opacity: 0, stagger: 0.4, duration: 0.5 }, 0.25)
+        .from('.form-foot', { opacity: 0, y: 10, duration: 0.3 })
+        .to('.select-field', { borderColor: '#ea725f', stagger: 0.16, duration: 0.2 })
+        .to('.select-field', { borderColor: '', duration: 0.3 });
+      gsap.timeline({ scrollTrigger: { trigger: '.debug-section', start: 'top top',
+        end: () => `+=${window.innerHeight * 0.85}`, pin: true, scrub: 0.6, anticipatePin: 1 } })
+        .from('.debug-console', { y: 50, rotateX: 12, scale: 0.94, duration: 0.6 })
+        .from('.console-lines code', { y: 20, opacity: 0, stagger: 0.4, duration: 0.5 }, 0.3)
+        .from('.console-foot', { opacity: 0, duration: 0.3 })
+        .from('.debug-message', { opacity: 0, scale: 0.9, duration: 0.3 });
+      gsap.from('.gateway-node', { scale: 0.6, opacity: 0, stagger: 0.2, ease: 'none', scrollTrigger: {
+        trigger: '.gateway-section', start: 'top 75%', end: 'center center', scrub: 0.6,
+      } });
+      gsap.from('.gateway-ring', { scale: 0.5, opacity: 0, stagger: 0.2, scrollTrigger: {
+        trigger: '.gateway-section', start: 'top 80%', end: 'center center', scrub: 0.7,
+      } });
       gsap.to('.story-line-progress', { height: '100%', ease: 'none', scrollTrigger: { trigger: '.story-track', start: 'top 18%', end: 'bottom 82%', scrub: true } });
       gsap.to('.story-image', { scale: 1.04, yPercent: -4, ease: 'none', scrollTrigger: { trigger: '.story-track', start: 'top bottom', end: 'bottom top', scrub: true } });
       gsap.to('.debug-atmosphere', { scale: 1.08, xPercent: 3, ease: 'none', scrollTrigger: { trigger: '.debug-section', start: 'top bottom', end: 'bottom top', scrub: true } });
@@ -203,13 +303,13 @@ function App() {
 
         <section className="marquee-band" aria-label="Rivlen principles"><div className="marquee-track"><span>Pan</span><i /><span>Connect</span><i /><span>Edit</span><i /><span>Deploy</span><i /><span>Debug</span><i /><span>Pan</span><i /><span>Connect</span><i /></div></section>
 
-        <section className="node-showcase section-shell"><div className="node-showcase-copy reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.nodes.eyebrow}</div><h2>{t.nodes.title}</h2><p>{t.nodes.body}</p></div><div className="node-rail reveal" aria-label={language === 'zh' ? 'Node-RED 节点示例' : 'Node-RED node examples'}>{t.nodes.labels.map((label, index) => { const Icon = nodeGlyphs[index]; return <div className={`node-card node-card-${index}`} key={label}><span className="node-port node-port-in" aria-hidden="true" /><span className="node-card-icon"><Icon size={19} weight="bold" /></span><span className="node-card-copy"><strong>{label}</strong><small>{t.nodes.captions[index]}</small></span><span className="node-port node-port-out" aria-hidden="true" /></div>; })}</div></section>
+        <section className="node-showcase section-shell"><div className="node-showcase-copy"><div className="eyebrow"><span className="eyebrow-dot" />{t.nodes.eyebrow}</div><h2>{t.nodes.title}</h2><div className="flow-captions">{t.nodes.steps.map((step, index) => <p className={`flow-caption flow-caption-${index}`} key={step}>{step}</p>)}</div><div className="flow-progress" aria-hidden="true"><span /></div></div><div className="node-rail" aria-label={language === 'zh' ? 'Node-RED 节点连接动画' : 'Node-RED connection animation'}><svg className="flow-wires" aria-hidden="true">{[0, 1, 2].map((index) => <g key={index}><path className="flow-wire-track" /><path className={`flow-wire flow-wire-${index}`} pathLength="1" /><circle className={`flow-packet flow-packet-${index}`} r="5" /></g>)}</svg>{t.nodes.labels.map((label, index) => { const Icon = nodeGlyphs[index]; return <div className={`node-card node-card-${index}`} key={label}>{index !== 0 && <span className="node-port node-port-in" aria-hidden="true" />}<span className="node-card-icon"><Icon size={19} weight="bold" /></span><span className="node-card-copy"><strong>{label}</strong><small>{t.nodes.captions[index]}</small></span>{index !== 3 && <span className="node-port node-port-out" aria-hidden="true" />}{index === 3 && <span className="node-notification" aria-hidden="true" />}</div>; })}<div className="flow-result"><span className="form-status" /><code>msg.payload <b>82.4</b></code><Check size={16} /></div></div></section>
 
         <section id="experience" className="story-track section-shell"><div className="story-intro reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.story.eyebrow}</div><h2>{t.story.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.story.body}</p><div className="story-small"><FlowArrow size={18} />{t.story.small}</div><div className="tag-row">{t.story.tags.map((tag) => <span key={tag}>{tag}</span>)}</div></div><div className="story-stage"><div className="story-line" aria-hidden="true"><span className="story-line-progress" /></div><div className="story-image reveal"><img src="/assets/rivlen-iphone-mockup.png" alt="Rivlen running inside an iPhone simulator mockup" /><div className="image-label"><span>02</span><span>{language === 'zh' ? '连接你的实例' : 'Connect your instance'}</span></div></div></div></section>
 
-        <section id="features" className="ha-section section-shell"><div className="ha-copy reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.ha.eyebrow}</div><h2>{t.ha.title}</h2><p>{t.ha.body}</p><div className="ha-note"><Check size={16} weight="bold" />{t.ha.note}</div></div><div className="form-stage reveal"><div className="form-window-top"><span>Home Assistant</span><span className="window-dots"><i /><i /><i /></span></div><div className="form-heading"><span>{language === 'zh' ? '编辑节点' : 'Edit node'}</span><SlidersHorizontal size={18} /></div><div className="form-list">{t.ha.labels.map((label, index) => <label key={label}><span>{label}</span><div className="select-field"><span>{t.ha.values[index]}</span><CaretDown size={15} /></div></label>)}</div><div className="form-foot"><span className="form-status" />{language === 'zh' ? '从实例加载' : 'Loaded from instance'}<ArrowUpRight size={15} /></div></div></section>
+        <section id="features" className="ha-section section-shell"><div className="ha-copy reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.ha.eyebrow}</div><h2>{t.ha.title}</h2><p>{t.ha.body}</p><div className="ha-note"><Check size={16} weight="bold" />{t.ha.note}</div></div><div className="form-stage"><div className="form-window-top"><span>Home Assistant</span><span className="window-dots"><i /><i /><i /></span></div><div className="form-heading"><span>{language === 'zh' ? '编辑节点' : 'Edit node'}</span><SlidersHorizontal size={18} /></div><div className="form-list">{t.ha.labels.map((label, index) => <label key={label}><span>{label}</span><div className="select-field"><span>{t.ha.values[index]}</span><CaretDown size={15} /></div></label>)}</div><div className="form-foot"><span className="form-status" />{language === 'zh' ? '从实例加载' : 'Loaded from instance'}<ArrowUpRight size={15} /></div></div></section>
 
-        <section className="debug-section"><img className="debug-atmosphere" src="/assets/debug-atmosphere.png" alt="" aria-hidden="true" /><div className="debug-inner section-shell"><div className="debug-copy reveal"><div className="eyebrow eyebrow-light"><span className="eyebrow-dot" />{t.debug.eyebrow}</div><h2>{t.debug.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.debug.body}</p><div className="debug-message"><span className="debug-pulse" /><span>{t.debug.pulse}</span><ArrowUpRight size={16} /></div></div><div className="debug-console reveal"><div className="console-header"><span><Bug size={18} weight="fill" />Debug</span><span className="console-live"><i />LIVE</span></div><div className="console-lines">{t.debug.log.map((line) => <code key={line}>{line}</code>)}</div><div className="console-foot"><Broadcast size={16} />{t.debug.note}</div></div></div></section>
+        <section className="debug-section"><img className="debug-atmosphere" src="/assets/debug-atmosphere.png" alt="" aria-hidden="true" /><div className="debug-inner section-shell"><div className="debug-copy reveal"><div className="eyebrow eyebrow-light"><span className="eyebrow-dot" />{t.debug.eyebrow}</div><h2>{t.debug.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.debug.body}</p><div className="debug-message"><span className="debug-pulse" /><span>{t.debug.pulse}</span><ArrowUpRight size={16} /></div></div><div className="debug-console"><div className="console-header"><span><Bug size={18} weight="fill" />Debug</span><span className="console-live"><i />LIVE</span></div><div className="console-lines">{t.debug.log.map((line) => <code key={line}>{line}</code>)}</div><div className="console-foot"><Broadcast size={16} />{t.debug.note}</div></div></div></section>
 
         <section className="gateway-section section-shell"><div className="gateway-art reveal"><div className="gateway-ring ring-one" /><div className="gateway-ring ring-two" /><div className="gateway-core"><QrCode size={54} weight="thin" /><span>Rivlen Gateway</span></div><div className="gateway-node node-a"><span />Node-RED</div><div className="gateway-node node-b"><LockKey size={15} />Private</div><div className="gateway-node node-c"><span />Phone</div></div><div className="gateway-copy reveal"><div className="eyebrow"><span className="eyebrow-dot" />{t.gateway.eyebrow}</div><h2>{t.gateway.title.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</h2><p>{t.gateway.body}</p><ul>{t.gateway.points.map((point) => <li key={point}><Check size={16} weight="bold" />{point}</li>)}</ul><button className="text-link" type="button" onClick={() => scrollTo('download')}>{t.gateway.cta}<ArrowRight size={17} /></button></div></section>
 

@@ -64,17 +64,29 @@ h1 { margin-top: 27px; color: var(--wine); font-size: clamp(56px, 7vw, 108px); l
 .marquee-track i { width: 6px; height: 6px; border-radius: 50%; background: var(--coral); }
 @keyframes marquee { to { transform: translateX(-35%); } }
 
-.node-showcase { min-height: 560px; padding-top: 150px; padding-bottom: 150px; display: grid; grid-template-columns: minmax(280px, .72fr) minmax(460px, 1.28fr); align-items: center; gap: 100px; }
+.node-showcase { height: 100svh; min-height: 620px; padding-top: 100px; padding-bottom: 65px; display: grid; grid-template-columns: minmax(280px, .72fr) minmax(460px, 1.28fr); align-items: center; gap: 75px; }
 .node-showcase-copy { max-width: 470px; }
-.node-showcase-copy p { margin-top: 26px; color: var(--muted); font-size: 16px; line-height: 1.62; max-width: 420px; }
-.node-rail { position: relative; display: grid; grid-template-columns: repeat(2, minmax(190px, 1fr)); gap: 18px 24px; padding: 28px 0 28px 34px; }
-.node-rail::before, .node-rail::after { content: ''; position: absolute; background: var(--line); }
-.node-rail::before { left: 5px; top: 50%; width: calc(100% - 10px); height: 1px; }
-.node-rail::after { left: 50%; top: 13%; width: 1px; height: 74%; }
-.node-card { position: relative; z-index: 1; min-height: 88px; display: flex; align-items: center; gap: 12px; padding: 15px 16px; border: 1px solid var(--line); border-radius: 16px; color: var(--ink); background: var(--surface); box-shadow: 0 15px 40px rgba(75, 22, 40, .07); }
-.node-card-1 { transform: translateY(28px); }
-.node-card-2 { transform: translateY(-22px); }
-.node-card-3 { transform: translateY(10px); }
+.node-showcase h2 { font-size: clamp(40px, 4.4vw, 66px); }
+.flow-captions { position: relative; height: 52px; margin-top: 28px; }
+.flow-caption { position: absolute; top: 0; left: 0; color: var(--muted); font-size: 17px; line-height: 1.5; }
+.flow-caption:not(:first-child) { visibility: hidden; }
+.flow-progress { width: 110px; height: 2px; margin-top: 20px; background: var(--line); }
+.flow-progress span { display: block; width: 100%; height: 100%; background: var(--coral); transform: scaleX(0); transform-origin: left; }
+.node-rail { position: relative; height: 390px; width: 100%; }
+.flow-wires { position: absolute; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.flow-wire, .flow-wire-track { fill: none; stroke-width: 2; stroke-linecap: round; }
+.flow-wire-track { stroke: var(--line); }
+.flow-wire { stroke: var(--coral); }
+.flow-packet { fill: var(--coral); filter: drop-shadow(0 0 5px rgba(234,114,95,.6)); }
+.node-card { position: absolute; z-index: 1; width: 42%; min-height: 84px; display: flex; align-items: center; gap: 12px; padding: 15px 16px; border: 1px solid var(--line); border-radius: 16px; color: var(--ink); background: var(--surface); box-shadow: 0 15px 40px rgba(75, 22, 40, .07); }
+.node-card-0 { left: 0; top: 12%; }
+.node-card-1 { right: 0; top: 12%; }
+.node-card-2 { left: 0; top: 62%; }
+.node-card-3 { right: 0; top: 62%; }
+.node-notification { position: absolute; right: 11px; top: 11px; width: 7px; height: 7px; border-radius: 50%; background: var(--coral); }
+.flow-result { position: absolute; bottom: -8px; right: 0; display: flex; align-items: center; gap: 10px; padding: 12px 15px; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); background: var(--surface); font-size: 11px; }
+.flow-result b { color: var(--wine); padding-left: 14px; }
+.flow-result > svg { color: var(--green); }
 .node-card-icon { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 11px; color: var(--wine); background: rgba(139, 37, 73, .1); }
 .node-card-copy { display: grid; gap: 5px; min-width: 0; }
 .node-card-copy strong { overflow: hidden; font-size: 13px; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
@@ -164,17 +176,30 @@ h2 { margin-top: 27px; color: var(--wine); font-size: clamp(42px, 5vw, 76px); li
   .hero-art img { width: 108%; max-width: none; margin-left: -5%; }
   .hero-art-caption { right: 4%; bottom: 3%; }
   .hero-scroll { position: static; margin-top: 14px; }
-  .node-showcase, .story-track, .ha-section, .gateway-section, .download-section { display: block; min-height: auto; padding-top: 120px; padding-bottom: 120px; }
+  .story-track, .ha-section, .gateway-section, .download-section { display: block; min-height: auto; padding-top: 120px; padding-bottom: 120px; }
+  .node-showcase { display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 12px; min-height: 620px; padding-top: 100px; padding-bottom: 45px; }
   .node-showcase-copy { max-width: 600px; }
-  .node-rail { margin-top: 58px; }
+  .node-showcase h2 { font-size: 42px; margin-top: 16px; }
+  .flow-captions { margin-top: 17px; height: 26px; }
+  .flow-progress { margin-top: 12px; }
+  .node-rail { height: min(39svh, 330px); min-height: 260px; margin-top: 20px; }
+  .node-card { min-height: 72px; padding: 11px; gap: 8px; }
+  .ha-section { height: 100svh; min-height: 650px; display: flex; flex-direction: column; justify-content: center; gap: 25px; padding-top: 90px; padding-bottom: 30px; }
+  .ha-section h2 { margin-top: 14px; font-size: 40px; }
+  .ha-copy p { margin-top: 16px; font-size: 14px; }
+  .ha-note { margin-top: 12px; }
+  .ha-section .form-stage { margin: 0 auto; max-width: 460px; }
+  .debug-section, .debug-inner { height: 100svh; min-height: 650px; }
+  .debug-inner { display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 30px; padding-top: 90px; padding-bottom: 35px; }
+  .debug-copy h2 { margin-top: 16px; font-size: 40px; }
+  .debug-copy p { margin-top: 16px; font-size: 14px; }
+  .debug-message { margin-top: 20px; }
+  .debug-inner .debug-console { margin-top: 0; }
   .story-intro { position: static; }
   .story-stage { min-height: 800px; margin-top: 54px; }
   .story-image { margin-left: 8%; width: min(78%, 360px); }
   .ha-copy, .gateway-copy, .download-copy { max-width: 600px; }
   .form-stage { margin: 54px auto 0; }
-  .debug-section, .debug-inner { min-height: 780px; }
-  .debug-inner { display: block; padding-top: 120px; padding-bottom: 120px; }
-  .debug-console { margin-top: 56px; }
   .gateway-art { margin: 50px auto 70px; }
   .download-panel { margin-top: 48px; }
   .download-foot { margin-top: 80px; }
@@ -190,18 +215,19 @@ h2 { margin-top: 27px; color: var(--wine); font-size: clamp(42px, 5vw, 76px); li
   h2 { font-size: 46px; }
   .hero-art { min-height: 330px; }
   .hero-art-caption { font-size: 8px; }
-  .node-showcase { padding-top: 100px; padding-bottom: 90px; }
-  .node-rail { grid-template-columns: 1fr; gap: 12px; margin-top: 44px; padding: 0 0 0 18px; }
-  .node-rail::before, .node-rail::after { display: none; }
-  .node-card-1, .node-card-2, .node-card-3 { transform: none; }
-  .node-card { min-height: 76px; }
-  .node-port-in { left: -5px; }
-  .node-port-out { right: -5px; }
+  .node-showcase { min-height: 600px; }
+  .node-showcase h2 { font-size: 36px; }
+  .node-card { width: 43%; min-height: 64px; padding: 9px; gap: 7px; border-radius: 13px; }
+  .node-card-icon { width: 27px; height: 30px; border-radius: 9px; }
+  .node-card-icon svg { width: 16px; }
+  .node-card-copy strong { font-size: 10px; }
+  .node-card-copy small { font-size: 8px; letter-spacing: 0; }
+  .flow-result { font-size: 10px; padding: 10px; }
   .story-track { padding-top: 100px; padding-bottom: 90px; }
   .story-stage { min-height: 700px; margin-top: 40px; }
   .story-image { margin-left: 8%; width: min(76%, 310px); }
   .image-label { font-size: 8px; padding-top: 9px; }
-  .ha-section, .gateway-section, .download-section { padding-top: 90px; padding-bottom: 90px; }
+  .gateway-section, .download-section { padding-top: 90px; padding-bottom: 90px; }
   .form-stage { padding: 16px; border-radius: 20px; }
   .form-heading { margin-top: 30px; font-size: 20px; }
   .gateway-art { width: min(100%, 390px); }
@@ -217,4 +243,27 @@ h2 { margin-top: 27px; color: var(--wine); font-size: clamp(42px, 5vw, 76px); li
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+@media (min-width: 901px) {
+  .ha-section { height: 100svh; min-height: 620px; padding-top: 100px; padding-bottom: 65px; }
+  .debug-section, .debug-inner { height: 100svh; min-height: 620px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .node-showcase, .ha-section, .debug-section, .debug-inner { height: auto; }
+  .node-showcase { padding-block: 120px; }
+  .flow-progress span { transform: none; }
+  .flow-packet { visibility: hidden; }
+}
+
+/* Pinned shells span the viewport so ScrollTrigger cannot collapse auto margins. */
+.node-showcase, .ha-section { width: 100%; margin-inline: 0; padding-inline: max(48px, calc((100% - 1240px) / 2)); }
+@media (max-width: 900px) {
+  .node-showcase, .ha-section { padding-inline: max(21px, calc((100% - 680px) / 2)); }
+  .ha-section .form-heading { margin-top: 22px; }
+  .ha-section .form-list { margin-top: 18px; gap: 12px; }
+  .ha-section .form-foot { margin-top: 20px; }
+}
+@media (max-width: 520px) {
+  .node-showcase, .ha-section { padding-inline: 22px; }
 }

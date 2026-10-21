@@ -5,7 +5,7 @@
 - Source visual truth: `/Users/hina/.codex/generated_images/01a15edc-421a-7733-84b8-ba278f96934b/exec-cfce49a6-356a-42d2-b84c-7939b350fcf5.png` (1536 × 1024 px, generated warm paper / wine / coral Flow direction selected by the user).
 - Implementation: `http://127.0.0.1:4173/` served from `website/` by Vite.
 - Implementation screenshot path: browser-rendered CUA capture of the implementation URL (the browser screenshot API exposed the capture in the QA session but did not provide a filesystem path). Desktop and mobile captures were both reviewed.
-- Desktop viewport: 1251 × 721 CSS px, device pixel ratio 1; full-page document height 5958 px.
+- Desktop viewport: 1251 × 721 CSS px, device pixel ratio 1; scroll-driven pinned node, form, and Debug scenes inspected at multiple scroll positions.
 - Mobile viewport: 390 × 844 CSS px, device pixel ratio 1.
 - State: Chinese light mode for the primary comparison; English toggle and dark mode were also checked.
 
@@ -16,6 +16,14 @@
 - Focused product evidence: `public/app-shots/rivlen-iphone17pro.png` is a portrait iPhone 17 Pro simulator capture, and `public/assets/rivlen-iphone-mockup.png` is its generated front-facing shell mockup. No physical iPhone was used. The Node-RED node rail, Home Assistant form, Debug console, gateway rings, and download controls were inspected at both desktop and 390 px layouts.
 - Primary interactions checked: nav anchors, CTA scroll, light/dark toggle, Chinese/English toggle, responsive stacking, disabled download states, and mobile language button accessibility label.
 - Console evidence: a fresh browser tab at the implementation URL reported no warning or error logs after load.
+
+## Scroll animation pass
+
+- Node canvas stays pinned while three SVG wires draw progressively. A message travels across each wire, the receiving node glows, and Debug reveals a notification dot and payload result.
+- Home Assistant form stays pinned while fields enter in order; Debug messages enter individually in a second pinned scene. Gateway rings and devices assemble with scroll progress.
+- Inspected desktop and 390 × 844 layouts at the connection, message, completion, form, and Debug stages. Mobile return-wire bends stay inside the viewport, and pinned shells retain their horizontal padding.
+- Timelines use scrub so scrolling upward reverses the sequence. Reduced-motion preference renders static content without pinning.
+- Browser console: no errors or warnings during the scroll pass.
 
 ## Findings
 
