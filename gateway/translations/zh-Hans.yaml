@@ -1,0 +1,24 @@
+configuration:
+  node_red_url:
+    name: Node-RED 地址
+    description: 网关容器可以访问的 HTTP 或 HTTPS 直连地址。不要填写 Home Assistant Ingress 地址。
+  node_red_auth:
+    name: Node-RED 认证方式
+    description: 选择网关连接 Node-RED 时使用的凭据类型。
+  node_red_username:
+    name: 用户名
+    description: basic 模式填写 Home Assistant 用户；admin 模式填写 Node-RED Admin API 用户。
+  node_red_password:
+    name: 密码
+    description: 所选用户名对应的密码。使用 Token 或无认证时留空。
+  node_red_token:
+    name: Node-RED Admin Token
+    description: Node-RED Admin API Bearer Token。仅在 token 模式填写。
+  pairing_password:
+    name: 配对密码
+    description: 设置一个至少 12 位的独立密码。配对时需要在网关网页和 Rivlen 中输入。
+  public_url:
+    name: 网关固定访问地址
+    description: 可选。配对邀请使用此固定地址；留空时使用浏览器当前访问的地址。
+network:
+  8787/tcp: 网关配对页面和 API

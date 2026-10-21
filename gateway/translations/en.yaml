@@ -1,0 +1,24 @@
+configuration:
+  node_red_url:
+    name: Node-RED URL
+    description: Direct HTTP or HTTPS address reachable from this app. Do not use the Home Assistant Ingress URL.
+  node_red_auth:
+    name: Node-RED authentication
+    description: Choose which credentials the gateway uses for Node-RED.
+  node_red_username:
+    name: Username
+    description: Home Assistant user for the Node-RED app in basic mode, or Node-RED Admin API user in admin mode.
+  node_red_password:
+    name: Password
+    description: Password for the selected username. Leave empty when using a token or no authentication.
+  node_red_token:
+    name: Node-RED Admin token
+    description: Bearer token for Node-RED Admin API. Use only with token mode.
+  pairing_password:
+    name: Pairing password
+    description: Create a separate password of at least 12 characters. Enter it in the gateway page and in Rivlen when pairing.
+  public_url:
+    name: Public gateway URL
+    description: Optional fixed URL used in pairing invitations. Leave empty to use the address shown in your browser.
+network:
+  8787/tcp: Gateway pairing page and API

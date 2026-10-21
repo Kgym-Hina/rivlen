@@ -55,3 +55,14 @@ Node-RED remains private; only the Flow Admin API and the allowlisted,
 read-only Home Assistant metadata routes are proxied to authorized Rivlen
 devices. See the gateway guide for password, TLS, reverse-proxy, and Docker
 configuration.
+
+### Install it from Home Assistant Apps
+
+[![Add the Rivlen Apps repository to Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FKgym-Hina%2Frivlen)
+
+On Home Assistant OS or another Supervisor-based installation, add this
+repository, install **Rivlen Gateway**, enter the Node-RED address and
+credentials in the App's Configuration tab, set a pairing password, then
+start it. Open the App's Web UI to pair Rivlen. See
+[`gateway/DOCS.md`](gateway/DOCS.md) for the field-by-field guide. Home
+Assistant Container installations without Supervisor cannot install Apps.

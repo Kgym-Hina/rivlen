@@ -108,7 +108,20 @@ type server struct {
 	tokenExpiry  time.Time
 }
 
+type homeAssistantAppOptions struct {
+	NodeRedURL      string `json:"node_red_url"`
+	NodeRedAuth     string `json:"node_red_auth"`
+	NodeRedUsername string `json:"node_red_username"`
+	NodeRedPassword string `json:"node_red_password"`
+	NodeRedToken    string `json:"node_red_token"`
+	PairingPassword string `json:"pairing_password"`
+	PublicURL       string `json:"public_url"`
+}
+
 func main() {
+	if err := loadHomeAssistantAppOptions(); err != nil {
+		log.Fatal(err)
+	}
 	cfg, err := readConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -140,6 +153,51 @@ func main() {
 	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
 		log.Fatal(serveErr)
 	}
+}
+
+func loadHomeAssistantAppOptions() error {
+	contents, err := os.ReadFile("/data/options.json")
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read Home Assistant App options: %w", err)
+	}
+	var options homeAssistantAppOptions
+	if err := json.Unmarshal(contents, &options); err != nil {
+		return fmt.Errorf("parse Home Assistant App options: %w", err)
+	}
+
+	authMode := "admin"
+	username, password, token := options.NodeRedUsername, options.NodeRedPassword, options.NodeRedToken
+	switch options.NodeRedAuth {
+	case "none":
+		username, password, token = "", "", ""
+	case "admin":
+	case "basic":
+		authMode = "basic"
+		token = ""
+	case "token":
+		username, password = "", ""
+	default:
+		return errors.New("node_red_auth must be none, admin, basic, or token")
+	}
+
+	values := map[string]string{
+		"RIVLEN_NODE_RED_URL":       options.NodeRedURL,
+		"RIVLEN_NODE_RED_AUTH_MODE": authMode,
+		"RIVLEN_NODE_RED_USERNAME":  username,
+		"RIVLEN_NODE_RED_PASSWORD":  password,
+		"RIVLEN_NODE_RED_TOKEN":     token,
+		"RIVLEN_PAIRING_PASSWORD":   options.PairingPassword,
+		"RIVLEN_PUBLIC_URL":         options.PublicURL,
+	}
+	for key, value := range values {
+		if err := os.Setenv(key, value); err != nil {
+			return fmt.Errorf("apply Home Assistant App option %s: %w", key, err)
+		}
+	}
+	return nil
 }
 
 func readConfig() (config, error) {

@@ -38,6 +38,13 @@
 - Reviewed desktop Chinese and 390 × 844 English layouts. Added higher-contrast wine accents for the guide’s dark theme. Code blocks scroll internally and do not widen the page.
 - Instructions were checked against gateway source. Compose now forwards RIVLEN_NODE_RED_AUTH_MODE; the guide also provides an override for older checkouts. No gateway was installed or changed on a remote server during this work.
 
+## Home Assistant App setup
+
+- Added a Home Assistant Apps repository manifest and a Rivlen Gateway App with translated Node-RED, authentication, pairing-password, and public-URL settings.
+- HA App configuration is read from `/data/options.json`; the gateway identity remains in `/data/gateway.json`, which Home Assistant includes in App backups.
+- Added a multi-architecture GHCR build workflow and an App Store `webui` link on port 8787. The App requires Supervisor and does not rely on Ingress for pairing.
+- The `/gateway` guide now includes a Home Assistant App install choice, a My Home Assistant repository link, configuration fields, network setup, and HA-specific troubleshooting in English and Chinese.
+
 ## Findings
 
 No actionable P0, P1, or P2 differences remain.

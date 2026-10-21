@@ -90,3 +90,13 @@ a.text-link { text-decoration: none; }
 .gateway-guide.is-dark .button-primary { color: #2b1520; }
 .guide-tool-links { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-top: 22px; }
 .guide-tool-links a { color: var(--wine); font-size: 12px; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.guide-ha-repo { display: inline-flex; align-items: center; gap: 10px; margin-top: 10px; text-decoration: none; }
+.guide-ha-steps { margin-top: 20px; }
+.guide-ha-fields { display: grid; gap: 18px; padding: 0; margin: 22px 0 25px; list-style: none; }
+.guide-step .guide-ha-fields li { display: grid; gap: 5px; margin: 0; padding: 15px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.guide-ha-fields strong { color: var(--ink); font-size: 13px; font-weight: 600; }
+.guide-ha-fields span { color: var(--muted); font-size: 13px; line-height: 1.8; }
+@media (max-width: 520px) {
+  .guide-ha-repo { width: 100%; justify-content: center; }
+  .guide-step .guide-ha-fields li { padding: 13px 14px; }
+}

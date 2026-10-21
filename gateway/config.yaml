@@ -1,0 +1,29 @@
+name: Rivlen Gateway
+version: "1.0.0"
+slug: rivlen_gateway
+description: Connect Rivlen to an existing Node-RED instance through a device-authenticated gateway.
+url: https://github.com/Kgym-Hina/rivlen/tree/main/gateway
+image: ghcr.io/kgym-hina/rivlen-gateway
+arch:
+  - aarch64
+  - amd64
+startup: application
+boot: auto
+init: true
+ports:
+  8787/tcp: 8787
+ports_description:
+  8787/tcp: Gateway pairing page and API
+webui: http://[HOST]:[PORT:8787]
+watchdog: http://[HOST]:8787/healthz
+options:
+  node_red_url: http://homeassistant:1880
+  node_red_auth: none
+schema:
+  node_red_url: url
+  node_red_auth: list(none|admin|basic|token)
+  node_red_username: str?
+  node_red_password: password?
+  node_red_token: password?
+  pairing_password: password(12,)
+  public_url: str?

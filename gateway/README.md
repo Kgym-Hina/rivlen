@@ -15,6 +15,19 @@ after ten minutes.
 The custom pairing password is required both to create an invitation and to
 exchange it for a device token.
 
+## Install as a Home Assistant App
+
+On Home Assistant OS or another Supervisor-based installation, add the Rivlen
+Apps repository and install **Rivlen Gateway** from Settings → Apps:
+
+[![Add the Rivlen Apps repository to Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FKgym-Hina%2Frivlen)
+
+Open the App's Configuration tab before starting. Set the direct Node-RED URL,
+authentication method, credentials, and a separate pairing password of at least
+12 characters. Port 8787 is mapped for the pairing page and API; the Open Web
+UI button opens it. Home Assistant Container without Supervisor does not
+support Apps. See [DOCS.md](DOCS.md) for each option and the pairing steps.
+
 ## Configure and run
 
 Go 1.23 or newer is required. Set a custom pairing password with at least 12

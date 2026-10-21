@@ -3,18 +3,34 @@ import { ArrowLeft, ArrowRight, Check, Copy, GlobeHemisphereWest, Moon, Sun, Ter
 import './gateway-guide.css';
 
 const repository = 'https://github.com/Kgym-Hina/rivlen';
+const addRepositoryURL = `https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=${encodeURIComponent(repository)}`;
 const sourceCommand = `git clone ${repository}.git\ncd rivlen/gateway`;
 const copy = {
   zh: {
     home: '返回 Rivlen', title: '让手机，连上你的 Flow。', intro: '安装网关，连接 Node-RED，再与 Rivlen 配对。',
     ai: '让 AI 帮你部署', aiBody: '复制提示词，粘贴给你的 AI Agent。它会先确认环境，再安装和配置。', prompt: '复制部署提示词', show: '查看提示词',
     copied: '已复制', copy: '复制', failed: '复制未成功，请选中文本手动复制。',
-    manual: '自己动手', manualBody: '选择你的环境，下面的配置和命令会同步切换。示例地址和密码需要替换。',
-    method: '安装方式', network: '访问方式', auth: 'Node-RED 认证', docker: 'Docker Compose', native: '原生 Go', lan: '仅局域网', https: '域名 + HTTPS',
-    noAuth: '无需认证', admin: 'Node-RED 账号', basic: 'Home Assistant App', token: 'Node-RED Token',
+    manual: '自己动手', manualBody: '选择安装方式、访问方式和认证，下面的步骤会同步切换。替换示例地址并设置自己的密码。',
+    method: '安装方式', network: '访问方式', auth: 'Node-RED 认证', docker: 'Docker Compose', native: '原生 Go', ha: 'Home Assistant App', lan: '仅局域网', https: '域名 + HTTPS',
+    noAuth: '无需认证', admin: 'Node-RED 账号', basic: 'HA 用户名 + 密码', token: 'Node-RED Token',
     steps: ['准备环境', '获取网关', '写入配置', '启动并检查', '连接网络', '配对手机'],
     ready: '先准备好这些', readyBody: '选择一台能访问 Node-RED 的常开电脑或服务器。手机需要能访问这台电脑的网关地址。',
     requirements: ['已有可正常打开的 Node-RED 实例，记录完整地址和端口。', '在部署机器上准备 Git。Docker 方式需要 Docker Engine / Desktop 和 Compose；原生方式需要 Go 1.23 或更新版本。', '终端示例使用 macOS、Linux 或 Windows WSL 的 shell。安装位置可自行选择；需要外置硬盘时先进入对应目录。'],
+    haGuide: {
+      readyBody: '需要运行 Home Assistant OS 或带 Supervisor 的 Home Assistant，并已有可访问的 Node-RED 实例。',
+      requirements: ['Home Assistant 设置中能看到 Apps；仅安装 Home Assistant Container 的环境没有 Supervisor，不能安装 Apps。', '准备 Node-RED 的直连地址和认证方式。默认建议先试 http://homeassistant:1880；Ingress 链接不能用于网关连接。', '手机需要能访问 Home Assistant 主机上的网关端口 8787。'],
+      getBody: '通过 Home Assistant Apps 商店添加 Rivlen 仓库，然后从商店安装 Rivlen Gateway。',
+      addButton: '在 Home Assistant 中添加仓库',
+      addSteps: ['打开后确认添加 Rivlen Apps 仓库。', '回到 Apps 商店，找到 Rivlen Gateway 并选择安装。'],
+      configBody: '安装完成后先打开 Rivlen Gateway 的“配置”页，填写下面这些选项，再启动 App。',
+      fields: [['Node-RED 地址', '填写网关容器可直接访问的 Node-RED 地址和端口。默认 http://homeassistant:1880；不要使用 Ingress 地址。若该地址不可达，尝试 HA App 的内部主机名或本机映射端口。'], ['认证方式与凭据', '按顶部选择的认证方式填写：无认证、Node-RED Admin 账号、HA 账号密码，或 Node-RED Admin Token。只填写所需凭据。'], ['配对密码', '设置至少 12 个字符的独立密码。'], ['网关固定访问地址', '局域网使用时留空，二维码将使用你打开网关页的地址；反向代理时填最终 HTTPS 地址。']],
+      startBody: '保存配置并启动 Rivlen Gateway。首次安装会从 GHCR 下载对应 HA 架构的镜像。',
+      health: 'App 页的运行状态和 Watchdog 会检查网关进程。启动后选择“打开 Web UI”，再验证配对和 Node-RED 连接。',
+      lanBody: '手机与 Home Assistant 在同一局域网时，浏览器打开 http://<HA 主机地址>:8787。若此端口被占用，可在 Rivlen Gateway 的“网络”页修改映射端口。',
+      httpsBody: '将 HTTPS 反向代理转发到 Home Assistant 主机的 8787 端口，并启用 WebSocket。然后在“配置”页填写最终 HTTPS 地址。',
+      browserURL: '网关页面地址', browserAddress: 'http://<HA 主机地址>:8787',
+      issues: [['HA 里找不到仓库', '确认仓库地址为 https://github.com/Kgym-Hina/rivlen，并在 Apps 商店菜单的 Repositories 中刷新。只支持带 Supervisor 的安装。'], ['网关 App 无法启动', '检查配置页中的配对密码是否至少 12 位、Node-RED URL 是否为有效直连地址；打开 App 日志查看具体错误。'], ['Node-RED 返回 401', '选择与 Node-RED 直连端口一致的认证模式。HA Node-RED App 常用 HA 用户名和密码的 basic 模式；HA 长期令牌不能替代。'], ['二维码地址不对', '局域网场景清空“网关固定访问地址”并通过正确的 HA 主机地址打开 Web UI；公网反代场景填写完整 HTTPS URL。'], ['二维码过期或已使用', '回到网关网页重新生成二维码。'], ['Flow 可读，Debug 没消息', '确认 Node-RED Debug 节点已启用并收到消息，同时检查 HA 反向代理是否支持 WebSocket。']],
+    },
     getBody: '在你选定的安装目录打开终端，获取源码。已下载源码时，直接进入其中的 gateway 文件夹。', source: '查看网关源码',
     configBody: '在 gateway 目录中创建 .env，写入下面的内容并替换占位符。不要把密码写进 Node-RED URL。',
     lanConfig: '将 192.168.1.10 换成网关电脑的局域网 IP。手机使用这个地址连接；0.0.0.0 只用于监听，不能作为配对地址。',
@@ -44,19 +60,34 @@ const copy = {
       ['二维码过期或已使用', '回到网关网页生成新的二维码，再扫描一次。'],
       ['Flow 可读，Debug 没消息', '检查代理的 WebSocket 支持，以及网关到 Node-RED 的 /comms 连通性；确保 Debug 节点启用并收到消息。'],
     ],
-    maintain: '保留配对关系', maintainBody: 'Docker 的 gateway-data 卷保存网关身份和设备授权；原生部署保留 data/gateway.json。更新或迁移时备份并保留这些数据，不要使用 docker compose down -v。更换配对密码不会撤销已有设备，请在 App 中撤销对应授权。',
+    maintain: '保留配对关系', maintainBody: 'Docker 的 gateway-data 卷、原生部署的 data/gateway.json，以及 HA App 的应用数据都保存网关身份和设备授权。迁移或更新时保留数据；HA App 数据会进入 Home Assistant 备份。更换配对密码不会撤销已有设备，请在 App 中撤销对应授权。',
     end: '网关已就绪，回到 Rivlen。', endLink: '获取 Rivlen', onThisPage: '本页步骤',
   },
   en: {
     home: 'Back to Rivlen', title: 'Connect your phone to your Flow.', intro: 'Install the gateway, connect Node-RED, then pair Rivlen.',
     ai: 'Let your AI deploy it', aiBody: 'Copy the prompt into your AI Agent. It will check your environment before installing and configuring the gateway.', prompt: 'Copy deployment prompt', show: 'View prompt',
     copied: 'Copied', copy: 'Copy', failed: 'Copy failed. Select the text and copy it manually.',
-    manual: 'Install it yourself', manualBody: 'Choose your environment. The configuration and commands below will adapt. Replace the example addresses and passwords.',
-    method: 'Installation', network: 'Access', auth: 'Node-RED authentication', docker: 'Docker Compose', native: 'Native Go', lan: 'Local network', https: 'Domain + HTTPS',
-    noAuth: 'No authentication', admin: 'Node-RED account', basic: 'Home Assistant App', token: 'Node-RED Token',
+    manual: 'Install it yourself', manualBody: 'Choose an installation method, access type, and authentication. The steps below will adapt.',
+    method: 'Installation', network: 'Access', auth: 'Node-RED authentication', docker: 'Docker Compose', native: 'Native Go', ha: 'Home Assistant App', lan: 'Local network', https: 'Domain + HTTPS',
+    noAuth: 'No authentication', admin: 'Node-RED account', basic: 'HA username + password', token: 'Node-RED Token',
     steps: ['Prepare', 'Get the gateway', 'Configure', 'Start and check', 'Network access', 'Pair your phone'],
     ready: 'What you need', readyBody: 'Use an always-on computer or server that can reach Node-RED. Your phone must be able to reach the gateway on that computer.',
     requirements: ['A working Node-RED instance, including its full address and port.', 'Git on the deployment machine. Docker installs require Docker Engine / Desktop with Compose; native installs require Go 1.23 or newer.', 'Commands use a macOS, Linux, or Windows WSL shell. Choose an installation directory first, including an external drive when desired.'],
+    haGuide: {
+      readyBody: 'You need Home Assistant OS or a Home Assistant installation with Supervisor, plus a reachable Node-RED instance.',
+      requirements: ['Home Assistant Settings must include Apps. Home Assistant Container without Supervisor cannot install Apps.', 'Have the direct Node-RED URL and its authentication method ready. Try http://homeassistant:1880 first; an Ingress URL cannot be used by the gateway.', 'Your phone must be able to reach port 8787 on the Home Assistant host.'],
+      getBody: 'Add the Rivlen repository through the Home Assistant Apps store, then install Rivlen Gateway from the store.',
+      addButton: 'Add repository in Home Assistant',
+      addSteps: ['Confirm adding the Rivlen Apps repository when Home Assistant opens.', 'Return to the Apps store, find Rivlen Gateway, and select Install.'],
+      configBody: 'After installation, open the Rivlen Gateway Configuration tab, fill in these options, and then start the App.',
+      fields: [['Node-RED URL', 'Enter the direct address and port reachable from the gateway container. The default is http://homeassistant:1880; do not use an Ingress URL. If unreachable, try the Node-RED App host name or its mapped local port.'], ['Authentication and credentials', 'Choose the method selected above: none, Node-RED Admin account, HA username and password, or Node-RED Admin token. Fill only the needed credentials.'], ['Pairing password', 'Set a separate password with at least 12 characters.'], ['Fixed gateway URL', 'Leave empty on a LAN so the pairing QR uses the address of the page you opened. For a reverse proxy, enter its final HTTPS URL.']],
+      startBody: 'Save the configuration and start Rivlen Gateway. On first install, Home Assistant downloads the image for its architecture from GHCR.',
+      health: 'The App status and Watchdog check that the gateway process responds. After it starts, select Open Web UI, then verify pairing and Node-RED access.',
+      lanBody: 'When your phone and Home Assistant share a LAN, open http://<HA host address>:8787. If that port is in use, change its mapping in the Rivlen Gateway Network tab.',
+      httpsBody: 'Forward your HTTPS reverse proxy to port 8787 on the Home Assistant host and enable WebSocket. Then enter the final HTTPS URL in the App Configuration tab.',
+      browserURL: 'Gateway page address', browserAddress: 'http://<HA host address>:8787',
+      issues: [['Repository is missing in Home Assistant', 'Check that the repository URL is https://github.com/Kgym-Hina/rivlen, then refresh Repositories in the Apps store menu. Supervisor is required.'], ['Gateway App will not start', 'Check that the pairing password has at least 12 characters and the Node-RED URL is a valid direct URL. Open the App logs for the specific error.'], ['Node-RED returns 401', 'Choose the authentication method used by the direct Node-RED port. The HA Node-RED App commonly uses basic with an HA username and password; an HA long-lived token is not a substitute.'], ['Wrong address in the QR code', 'For LAN access, clear Fixed gateway URL and open Web UI through the correct HA host address. For a public reverse proxy, enter the full HTTPS URL.'], ['Expired or used QR code', 'Generate a new QR code on the gateway page.'], ['Flows load but Debug is empty', 'Confirm the Node-RED Debug node is enabled and receives messages. Check that the HA reverse proxy supports WebSocket.']],
+    },
     getBody: 'Open a terminal in your chosen installation directory and get the source. If you already have it, enter its gateway folder.', source: 'View gateway source',
     configBody: 'Create .env in the gateway folder, paste the configuration below, and replace the placeholders. Keep credentials out of the Node-RED URL.',
     lanConfig: 'Replace 192.168.1.10 with the gateway computer’s LAN IP. Your phone connects to this address; 0.0.0.0 is a bind address, not a pairing URL.',
@@ -86,7 +117,7 @@ const copy = {
       ['Expired or used QR code', 'Generate a new QR code on the gateway page and scan again.'],
       ['Flows load but Debug is empty', 'Check WebSocket forwarding and /comms connectivity between the gateway and Node-RED. Enable the Debug node and make sure it receives messages.'],
     ],
-    maintain: 'Keep your pairings', maintainBody: 'Docker stores gateway identity and device authorizations in the gateway-data volume. Native installs use data/gateway.json. Back up and preserve this data when updating or migrating; avoid docker compose down -v. Changing the pairing password does not revoke existing devices—revoke them in the app.',
+    maintain: 'Keep your pairings', maintainBody: 'Docker stores gateway identity and authorizations in the gateway-data volume; native installs use data/gateway.json; the HA App uses its persistent app data, included in Home Assistant backups. Preserve this data when moving or updating. Changing the pairing password does not revoke existing devices—revoke them in the app.',
     end: 'Your gateway is ready.', endLink: 'Get Rivlen', onThisPage: 'On this page',
   },
 };
@@ -117,8 +148,12 @@ export default function GatewayGuide() {
   const [auth, setAuth] = useState('none');
   const t = copy[language];
   const zh = language === 'zh';
+  const chooseMethod = (nextMethod) => {
+    setMethod(nextMethod);
+    if (nextMethod === 'ha' && auth === 'none') setAuth('basic');
+  };
   const publicURL = network === 'lan' ? 'http://192.168.1.10:8787' : 'https://flows.example.com';
-  const nodeURL = method === 'docker' ? 'http://host.docker.internal:1880' : 'http://127.0.0.1:1880';
+  const nodeURL = method === 'docker' ? 'http://host.docker.internal:1880' : method === 'ha' ? 'http://homeassistant:1880' : 'http://127.0.0.1:1880';
   const env = [
     ...(method === 'docker' ? [`RIVLEN_BIND=${network === 'lan' ? '0.0.0.0' : '127.0.0.1'}`, 'RIVLEN_PORT=8787'] : [`RIVLEN_GATEWAY_LISTEN=${network === 'lan' ? '0.0.0.0' : '127.0.0.1'}:8787`, 'RIVLEN_DATA_FILE=./data/gateway.json']),
     `RIVLEN_NODE_RED_URL=${nodeURL}`, `RIVLEN_PUBLIC_URL=${publicURL}`, "RIVLEN_PAIRING_PASSWORD='REPLACE_WITH_YOUR_12_PLUS_CHARACTER_PASSWORD'",
@@ -128,7 +163,33 @@ export default function GatewayGuide() {
   ].join('\n');
   const override = 'services:\n  rivlen-gateway:\n    environment:\n      RIVLEN_NODE_RED_AUTH_MODE: basic';
   const start = method === 'docker' ? 'docker compose up -d --build\ndocker compose ps\ndocker compose logs --tail=50 rivlen-gateway' : 'set -a\n. ./.env\nset +a\nmkdir -p data\ngo build -trimpath -o rivlen-gateway .\n./rivlen-gateway';
-  const prompt = zh ? `请帮我部署并配置 Rivlen Gateway，让我的手机通过它连接已有 Node-RED。\n\n源码：${repository}，网关位于 gateway/，先阅读 gateway/README.md、main.go、compose.yaml 和 .env.example，以当前源码为准。\n所选方案：${t[method]}；${t[network]}；认证：${t[auth === 'none' ? 'noAuth' : auth]}。\n\n1. 先检查可用工具和已有环境。向我确认缺少的信息：部署主机与系统、安装目录（是否外置硬盘）、Node-RED 完整地址、认证方式、手机可访问的网关地址；公网方案还需确认域名和已有 HTTPS 代理。不要把示例地址当作真实地址。\n2. 获取源码，只部署 gateway。保留已有 Node-RED 和 Flow，不重置已有网关数据或覆盖已有配置。若通过 SSH 部署，先在本地或 CI 构建目标平台产物再上传，未经明确许可不要在 SSH 服务器上构建。\n3. 创建 .env 并限制文件权限；设置至少 12 位的独立配对密码。认证信息通过私有配置输入，不写进源码或回显日志。普通 Node-RED 使用 Admin 账号或 Token；Home Assistant App 直连端口使用 basic + HA 账号密码，不能用 HA 长期令牌替代。检查 Compose 是否传递 RIVLEN_NODE_RED_AUTH_MODE，缺少时使用 compose.override.yaml 显式补上。\n4. RIVLEN_NODE_RED_URL 应从网关所在的网络环境可达。Docker 访问宿主机可用 host.docker.internal，不能误用容器内的 localhost。RIVLEN_PUBLIC_URL 必须是手机可访问的最终地址；Compose 模板要求显式设置它。局域网方案只允许本地网络访问；公网方案使用有效 HTTPS，支持 WebSocket，保留 Host 与 X-Forwarded-Proto，仅暴露网关，不公开 Node-RED。\n5. 启动网关并设置适合系统的持久运行方式，保留 Docker 数据卷或原生 data/gateway.json。验证 /healthz 返回 204，再验证到 Node-RED 的认证、Flow 读取和 /comms；仅有健康检查成功不代表上游连接正常。\n6. 最后给我实际访问地址、启动/停止/重启命令、配置与数据位置。指导我打开网页输入配对密码生成二维码，再在 Rivlen → 连接新实例 → 通过网关配对中扫描、输入同一密码并命名设备。邀请单次有效、10 分钟过期；首个设备为所有者。不要在报告里回显密码。\n\n请实际完成可执行的部署工作，并说明需要我亲自完成的步骤和未验证项。` : `Deploy and configure Rivlen Gateway so my phone can connect to my existing Node-RED.\n\nSource: ${repository}; gateway source is in gateway/. Read README.md, main.go, compose.yaml, and .env.example there first; follow the current code.\nSelected setup: ${t[method]}; ${t[network]}; authentication: ${t[auth === 'none' ? 'noAuth' : auth]}.\n\n1. Inspect the available tools and environment. Ask only for missing details: target host/OS, installation directory (including external storage), full Node-RED URL and authentication, phone-reachable gateway URL, and any domain/HTTPS proxy. Do not use example addresses as real values.\n2. Obtain source and deploy gateway only. Preserve Node-RED, flows, existing gateway data, and configuration. For SSH targets, build the target-platform artifact locally or in CI and upload it; do not build on an SSH server without explicit authorization.\n3. Create a private .env and a separate pairing password of at least 12 characters. Keep credentials out of source and logs. Standard Node-RED uses an Admin account or token; Home Assistant App direct ports use basic with HA credentials, not an HA long-lived token. Verify Compose forwards RIVLEN_NODE_RED_AUTH_MODE; add compose.override.yaml if needed.\n4. Make RIVLEN_NODE_RED_URL reachable from the gateway environment. Docker can use host.docker.internal for its host; container localhost is different. Set RIVLEN_PUBLIC_URL to the final phone-reachable URL; the Compose template requires it. LAN-only means local network access only. Internet access requires valid HTTPS, WebSocket forwarding, Host and X-Forwarded-Proto. Expose only the gateway, keeping Node-RED private.\n5. Start a persistent service and preserve its data volume or native data/gateway.json. Verify HTTP 204 from /healthz, then upstream authentication, Flow reads, and /comms. A successful health check alone does not verify Node-RED.\n6. Return the real URL, start/stop/restart commands, and configuration/data locations. Guide me through entering the pairing password on the gateway page, generating a QR code, then scanning in Rivlen → Connect new instance → Pair through gateway, entering the same password and naming the device. Invitations are single-use, expire in 10 minutes, and the first device becomes the owner. Do not echo passwords in the report.\n\nComplete the deployment steps you can execute and clearly identify any user-only steps or unverified items.`;
+  const prompt = zh
+    ? `请帮我安装并配置 Rivlen Gateway，让手机上的 Rivlen 连接现有 Node-RED。
+
+源码：${repository}。先阅读 gateway/README.md、gateway/DOCS.md、gateway/config.yaml 和 gateway/main.go，以仓库当前版本为准。
+方案：${t[method]}；网络：${t[network]}；Node-RED 认证：${t[auth === 'none' ? 'noAuth' : auth]}。
+
+1. ${method === 'ha' ? '确认 Home Assistant 有 Supervisor（Settings 中可见 Apps）。通过 Apps 商店添加此仓库并安装 Rivlen Gateway；使用预构建 GHCR 多架构镜像。不要让用户 SSH 或手工安装 Docker。' : '检查部署主机、Node-RED 直连地址和认证方式、手机可访问的网关地址；公网方案还需域名与 HTTPS 代理信息。只询问缺失项。'}
+2. ${method === 'ha' ? '在 Rivlen Gateway 的配置表单中填写 Node-RED URL、认证方式和对应凭据。HA Node-RED App 使用直连端口和 basic + HA 用户名密码；不要填 Ingress URL 或用 HA 长期令牌替代。' : '只部署 gateway/，保留 Node-RED、Flow 和已有网关数据。SSH 目标未经明确授权不要在服务器上构建；在本地或 CI 构建再上传。'}
+3. ${method === 'ha' ? '设置至少 12 位的独立配对密码。局域网使用时固定网关 URL 留空；HTTPS 反代时填写最终 URL 并确认转发 WebSocket。保存并启动 App。' : '把凭据放入私有配置，不写进源码或日志。Docker / 原生 Go 按 gateway/README.md 操作；配对密码至少 12 位。'}
+4. ${method === 'ha' ? '从 HA App 的 Open Web UI 按钮打开网关网页；默认局域网端口 8787。确保手机可访问 HA 主机该端口。' : '确保 Node-RED URL 从网关网络可达，二维码使用手机可访问的最终地址。仅公开网关，Node-RED 保持私有；公网必须使用 HTTPS。'}
+5. 验证 /healthz 返回 204，再验证 Node-RED 认证、Flow 读取和 /comms。仅有健康检查成功不代表上游正常。
+6. 指导我在网关网页输入配对密码并生成二维码，再在 Rivlen → 连接新实例 → 通过网关配对中扫描、输入同一密码并命名设备。邀请只能使用一次、10 分钟后过期；首个设备为所有者。不要在报告中回显密码。
+
+最后给出真实访问地址、需要我亲自完成的步骤、配置与数据位置，以及未验证项。`
+    : `Install and configure Rivlen Gateway so Rivlen on my phone can connect to my existing Node-RED.
+
+Source: ${repository}. Read gateway/README.md, gateway/DOCS.md, gateway/config.yaml, and gateway/main.go first; follow the current repository version.
+Setup: ${t[method]}; access: ${t[network]}; Node-RED authentication: ${t[auth === 'none' ? 'noAuth' : auth]}.
+
+1. ${method === 'ha' ? 'Confirm Home Assistant has Supervisor (Apps is visible in Settings). Add this repository in the Apps store and install Rivlen Gateway from its prebuilt multi-architecture GHCR image. Do not ask the user to SSH or install Docker manually.' : 'Inspect the deployment host, direct Node-RED URL and authentication, and the gateway URL reachable by the phone. For internet access, confirm the domain and HTTPS proxy. Ask only for missing details.'}
+2. ${method === 'ha' ? 'Fill in the Node-RED URL, authentication method, and matching credentials in the Rivlen Gateway configuration form. The HA Node-RED App uses its direct port and basic with an HA username and password; do not use an Ingress URL or substitute an HA long-lived token.' : 'Deploy gateway/ only. Preserve Node-RED, flows, and existing gateway data. Do not build on an SSH server without explicit authorization; build locally or in CI and upload.'}
+3. ${method === 'ha' ? 'Set a separate pairing password of at least 12 characters. Leave the fixed gateway URL empty for LAN use; for an HTTPS proxy, enter the final URL and confirm WebSocket forwarding. Save and start the App.' : 'Keep credentials in private configuration, out of source and logs. Follow gateway/README.md for Docker or native Go. Use a separate pairing password of at least 12 characters.'}
+4. ${method === 'ha' ? 'Open the gateway page with the HA App Open Web UI button. The default LAN port is 8787; ensure the phone can reach that port on the HA host.' : 'Make Node-RED reachable from the gateway and use the final phone-reachable URL in pairing. Expose only the gateway, keep Node-RED private, and require HTTPS for internet access.'}
+5. Verify /healthz returns 204, then verify Node-RED authentication, flow reads, and /comms. A health check alone does not verify the upstream.
+6. Guide me through entering the pairing password on the gateway page and generating a QR code, then scanning it in Rivlen → Connect new instance → Pair through gateway, entering the same password, and naming the device. Invitations are single-use and expire in 10 minutes; the first device becomes owner. Do not echo passwords in the report.
+
+Return the real URL, any steps I must do myself, configuration and data locations, and anything left unverified.`;
   useEffect(() => { document.documentElement.lang = zh ? 'zh-CN' : 'en'; document.title = zh ? '网关安装与配对 · Rivlen' : 'Gateway setup & pairing · Rivlen'; }, [zh]);
 
   return <div className={`site gateway-guide ${dark ? 'is-dark' : ''}`}>
@@ -136,15 +197,15 @@ export default function GatewayGuide() {
     <main className="guide-shell">
       <div className="guide-hero"><div className="eyebrow"><span className="eyebrow-dot" />Rivlen Gateway</div><h1>{t.title}</h1><p>{t.intro}</p></div>
       <section className="guide-ai"><div className="guide-ai-icon"><Sparkle size={27} /></div><div><h2>{t.ai}</h2><p>{t.aiBody}</p><div className="guide-ai-actions"><CopyButton text={prompt} t={t} label={t.prompt} primary /><a href="#manual">{t.manual}<ArrowRight size={16} /></a></div><details className="guide-prompt"><summary>{t.show}</summary><textarea readOnly value={prompt} aria-label={t.show} onFocus={(event) => event.target.select()} /></details></div></section>
-      <section id="manual" className="guide-options"><div className="eyebrow"><TerminalWindow size={16} />{t.manual}</div><p>{t.manualBody}</p><div className="guide-option-grid">{[[t.method, method, setMethod, [['docker', t.docker], ['native', t.native]]], [t.network, network, setNetwork, [['lan', t.lan], ['https', t.https]]], [t.auth, auth, setAuth, [['none', t.noAuth], ['admin', t.admin], ['basic', t.basic], ['token', t.token]]]].map(([label, value, setter, options]) => <label key={label}><span>{label}</span><select value={value} onChange={(event) => setter(event.target.value)}>{options.map(([key, text]) => <option key={key} value={key}>{text}</option>)}</select></label>)}</div></section>
+      <section id="manual" className="guide-options"><div className="eyebrow"><TerminalWindow size={16} />{t.manual}</div><p>{t.manualBody}</p><div className="guide-option-grid">{[[t.method, method, chooseMethod, [['docker', t.docker], ['native', t.native], ['ha', t.ha]]], [t.network, network, setNetwork, [['lan', t.lan], ['https', t.https]]], [t.auth, auth, setAuth, [['none', t.noAuth], ['admin', t.admin], ['basic', t.basic], ['token', t.token]]]].map(([label, value, setter, options]) => <label key={label}><span>{label}</span><select value={value} onChange={(event) => setter(event.target.value)}>{options.map(([key, text]) => <option key={key} value={key}>{text}</option>)}</select></label>)}</div></section>
       <div className="guide-layout"><aside className="guide-toc"><span>{t.onThisPage}</span>{t.steps.map((step, index) => <a key={step} href={`#step-${index + 1}`}><small>{String(index + 1).padStart(2, '0')}</small>{step}</a>)}<a href="#troubleshooting">{t.troubleshoot}</a></aside><div className="guide-body">
-        <Step number={1} title={t.steps[0]}><p>{t.readyBody}</p><ul>{t.requirements.map(item => <li key={item}>{item}</li>)}</ul><div className="guide-tool-links"><a href="https://www.docker.com/get-started/" target="_blank" rel="noreferrer">Docker</a><a href="https://go.dev/dl/" target="_blank" rel="noreferrer">Go</a><a href="https://git-scm.com/downloads" target="_blank" rel="noreferrer">Git</a></div></Step>
-        <Step number={2} title={t.steps[1]}><p>{t.getBody}</p><CodeBlock text={sourceCommand} t={t} label="Terminal" /><a className="text-link" href={`${repository}/tree/main/gateway`} target="_blank" rel="noreferrer">{t.source}<ArrowRight size={15} /></a></Step>
-        <Step number={3} title={t.steps[2]}><p>{t.configBody}</p><CodeBlock text={env} t={t} label=".env" /><CodeBlock text="chmod 600 .env" t={t} label="Terminal" /><p>{network === 'lan' ? t.lanConfig : t.httpsConfig}</p><p>{t.urlHelp}</p><p>{t.passwordHelp}</p>{auth !== 'none' && <div className="guide-note"><ShieldCheck size={20} /><p>{t[`${auth}Help`]}</p></div>}{method === 'docker' && auth === 'basic' && <><p>{t.override}</p><CodeBlock text={override} t={t} label="compose.override.yaml" /></>}</Step>
-        <Step number={4} title={t.steps[3]}><p>{method === 'docker' ? t.startBody : t.nativeStart}</p><CodeBlock text={start} t={t} label="Terminal" /><p>{t.health}</p><CodeBlock text="curl -i http://127.0.0.1:8787/healthz" t={t} label="HTTP 204" /></Step>
-        <Step number={5} title={t.steps[4]}><p>{network === 'lan' ? t.lanBody : t.httpsBody}</p>{network === 'https' && <><CodeBlock text="flows.example.com {\n    reverse_proxy 127.0.0.1:8787\n}" t={t} label="Caddyfile" /><p>{t.proxyHelp}</p><p>{t.publicHelp}</p></>}<div className="guide-address"><span>{t.browserURL}</span><code>{publicURL}</code></div></Step>
+        <Step number={1} title={t.steps[0]}><p>{method === 'ha' ? t.haGuide.readyBody : t.readyBody}</p><ul>{(method === 'ha' ? t.haGuide.requirements : t.requirements).map(item => <li key={item}>{item}</li>)}</ul>{method !== 'ha' && <div className="guide-tool-links"><a href="https://www.docker.com/get-started/" target="_blank" rel="noreferrer">Docker</a><a href="https://go.dev/dl/" target="_blank" rel="noreferrer">Go</a><a href="https://git-scm.com/downloads" target="_blank" rel="noreferrer">Git</a></div>}</Step>
+        <Step number={2} title={t.steps[1]}><p>{method === 'ha' ? t.haGuide.getBody : t.getBody}</p>{method === 'ha' ? <><a className="button button-primary guide-ha-repo" href={addRepositoryURL} target="_blank" rel="noreferrer">{t.haGuide.addButton}<ArrowRight size={16} /></a><ol className="guide-pairing guide-ha-steps">{t.haGuide.addSteps.map(item => <li key={item}>{item}</li>)}</ol></> : <><CodeBlock text={sourceCommand} t={t} label="Terminal" /><a className="text-link" href={`${repository}/tree/main/gateway`} target="_blank" rel="noreferrer">{t.source}<ArrowRight size={15} /></a></>}</Step>
+        <Step number={3} title={t.steps[2]}><p>{method === 'ha' ? t.haGuide.configBody : t.configBody}</p>{method === 'ha' ? <><ul className="guide-ha-fields">{t.haGuide.fields.map(([label, body]) => <li key={label}><strong>{label}</strong><span>{body}</span></li>)}</ul>{auth !== 'none' && <div className="guide-note"><ShieldCheck size={20} /><p>{t[`${auth}Help`]}</p></div>}</> : <><CodeBlock text={env} t={t} label=".env" /><CodeBlock text="chmod 600 .env" t={t} label="Terminal" /><p>{network === 'lan' ? t.lanConfig : t.httpsConfig}</p><p>{t.urlHelp}</p><p>{t.passwordHelp}</p>{auth !== 'none' && <div className="guide-note"><ShieldCheck size={20} /><p>{t[`${auth}Help`]}</p></div>}{method === 'docker' && auth === 'basic' && <><p>{t.override}</p><CodeBlock text={override} t={t} label="compose.override.yaml" /></>}</>}</Step>
+        <Step number={4} title={t.steps[3]}><p>{method === 'ha' ? t.haGuide.startBody : method === 'docker' ? t.startBody : t.nativeStart}</p>{method !== 'ha' && <CodeBlock text={start} t={t} label="Terminal" />}<p>{method === 'ha' ? t.haGuide.health : t.health}</p>{method !== 'ha' && <CodeBlock text="curl -i http://127.0.0.1:8787/healthz" t={t} label="HTTP 204" />}</Step>
+        <Step number={5} title={t.steps[4]}><p>{method === 'ha' ? (network === 'lan' ? t.haGuide.lanBody : t.haGuide.httpsBody) : (network === 'lan' ? t.lanBody : t.httpsBody)}</p>{method !== 'ha' && network === 'https' && <><CodeBlock text="flows.example.com {\n    reverse_proxy 127.0.0.1:8787\n}" t={t} label="Caddyfile" /><p>{t.proxyHelp}</p><p>{t.publicHelp}</p></>}<div className="guide-address"><span>{method === 'ha' ? t.haGuide.browserURL : t.browserURL}</span><code>{method === 'ha' ? (network === 'lan' ? t.haGuide.browserAddress : 'https://flows.example.com') : publicURL}</code></div></Step>
         <Step number={6} title={t.steps[5]}><div className="guide-pair-heading"><QrCode size={36} /><p>{t.pairIntro}</p></div><ol className="guide-pairing">{t.pairing.map(item => <li key={item}>{item}</li>)}</ol><p>{t.invitation}</p><p>{t.owner}</p></Step>
-        <section id="troubleshooting" className="guide-step"><h2>{t.troubleshoot}</h2><div className="guide-faq">{t.issues.map(([title, body]) => <details key={title}><summary>{title}</summary><p>{body}</p></details>)}</div></section>
+        <section id="troubleshooting" className="guide-step"><h2>{t.troubleshoot}</h2><div className="guide-faq">{(method === 'ha' ? t.haGuide.issues : t.issues).map(([title, body]) => <details key={title}><summary>{title}</summary><p>{body}</p></details>)}</div></section>
         <section className="guide-step guide-maintain"><ShieldCheck size={24} /><h2>{t.maintain}</h2><p>{t.maintainBody}</p></section>
       </div></div>
       <footer className="guide-footer"><span>{t.end}</span><a className="text-link" href="/#download">{t.endLink}<ArrowRight size={18} /></a></footer>
